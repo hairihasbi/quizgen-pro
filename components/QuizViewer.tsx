@@ -13,28 +13,44 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isClientExporting, setIsClientExporting] = useState(false);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if ((window as any).observeMathItems) {
-        (window as any).observeMathItems('quiz-print-area');
+  // Fungsi pembantu untuk merender ulang rumus
+  const triggerMathJax = async (elementId: string) => {
+    const el = document.getElementById(elementId);
+    if (el && (window as any).MathJax && (window as any).MathJax.typesetPromise) {
+      try {
+        await (window as any).MathJax.typesetPromise([el]);
+        // Beri jeda paint kecil agar browser menggambar SVG ke layer bitmap
+        await new Promise(r => setTimeout(r, 500));
+      } catch (err) {
+        console.warn("MathJax typeset failed", err);
       }
-    }, 500);
+    }
+  };
+
+  useEffect(() => {
+    // Jalankan typesetting setiap kali mode atau data berubah
+    const timer = setTimeout(() => {
+      triggerMathJax('quiz-print-area');
+    }, 300);
     return () => clearTimeout(timer);
   }, [quiz, showAnswer, exportMode]);
 
   const handleExportPdfClient = async () => {
     const element = document.getElementById('quiz-print-area');
     if (!element || !(window as any).html2pdf) {
-      alert("Library PDF belum siap.");
+      alert("Library PDF belum siap, silakan tunggu sebentar.");
       return;
     }
 
+    // 1. Tampilkan state loading (ini memicu re-render React)
     setIsClientExporting(true);
 
-    // Pastikan MathJax selesai merender ulang area cetak sebelum dicapture
-    if ((window as any).MathJax && (window as any).MathJax.typesetPromise) {
-      await (window as any).MathJax.typesetPromise([element]);
-    }
+    // 2. TUNGGU React selesai rendering (penting!)
+    // Tanpa jeda ini, MathJax akan mencoba merender DOM yang sedang diupdate React
+    await new Promise(r => setTimeout(r, 600));
+
+    // 3. Paksa MathJax render ulang teks mentah yang mungkin muncul akibat re-render di step 1
+    await triggerMathJax('quiz-print-area');
     
     const opt = {
       margin: 10,
@@ -44,19 +60,23 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
         scale: 2, 
         useCORS: true,
         letterRendering: true,
-        logging: false
+        logging: false,
+        // Pastikan font-font khusus tetap terjaga
+        fontFamily: 'Plus Jakarta Sans, Noto Serif, Arial'
       },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
     };
 
-    (window as any).html2pdf().set(opt).from(element).save().then(() => {
-      setIsClientExporting(false);
-    }).catch((err: any) => {
+    // 4. Jalankan konversi ke PDF
+    try {
+      await (window as any).html2pdf().set(opt).from(element).save();
+    } catch (err: any) {
       console.error(err);
-      setIsClientExporting(false);
       alert("Gagal export: " + err.message);
-    });
+    } finally {
+      setIsClientExporting(false);
+    }
   };
 
   const handleDownloadPdfSSR = async () => {
@@ -80,7 +100,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Quiz_${quiz.title.replace(/\s+/g, '_')}_Pro.pdf`;
+      a.download = `Quiz_${quiz.title.replace(/\s+/g, '_')}_SSR.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -118,7 +138,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
             {isClientExporting ? (
               <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
             ) : (
-              <><span>📥</span><span>PDF (Instan)</span></>
+              <><span>📥</span><span>Export PDF</span></>
             )}
           </button>
 
@@ -130,7 +150,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
             {isDownloading ? (
               <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
             ) : (
-              <><span>☁️</span><span>PDF (Engine)</span></>
+              <><span>☁️</span><span>PDF (Server)</span></>
             )}
           </button>
 
@@ -142,7 +162,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
       <div className="flex-1 overflow-y-auto p-0 md:p-12 flex justify-center custom-scrollbar print-scroll-container">
         <div id="quiz-print-area" className="print-container bg-white text-gray-900 shadow-none border-none">
           
-          {/* Header Identitas Sekolah */}
+          {/* Header Identitas */}
           <div className="text-center mb-1">
             <h1 className="text-xl font-black m-0" style={{fontFamily: 'Plus Jakarta Sans'}}>BANK SOAL KURIKULUM MERDEKA</h1>
             <h2 className="text-lg font-bold m-0" style={{fontFamily: 'Plus Jakarta Sans'}}>{quiz.subject.toUpperCase()} - {quiz.grade.toUpperCase()}</h2>
@@ -151,7 +171,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
           
           <div className="border-t-[3px] border-b border-black h-[5px] mb-6"></div>
 
-          {/* Tabel Informasi Identitas */}
           <table className="w-full mb-8 text-[10.5pt] font-bold border-collapse">
             <tbody>
               <tr>
@@ -174,7 +193,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
 
           <div className="space-y-8">
             {exportMode === 'kisi-kisi' ? (
-              /* TABEL KISI-KISI SUPER LENGKAP */
               <table className="w-full border-collapse border-2 border-black text-[8.5pt]">
                 <thead>
                   <tr className="bg-gray-100">
@@ -195,7 +213,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                         <div className="font-bold text-gray-800">{q.topic || quiz.topic}</div>
                       </td>
                       <td className="border-2 border-black p-2 align-top text-justify">
-                        {q.indicator}
+                        <div dangerouslySetInnerHTML={{ __html: q.indicator }}></div>
                       </td>
                       <td className="border-2 border-black p-2 text-center font-bold uppercase">{q.cognitiveLevel?.split(' - ')[0] || q.cognitiveLevel}</td>
                       <td className="border-2 border-black p-2 text-center text-[8pt] uppercase">{q.type}</td>
@@ -208,7 +226,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                 </tbody>
               </table>
             ) : (
-              /* URAIAN SOAL */
               quiz.questions.map((q, i) => {
                 const isNewPassage = q.passage && (i === 0 || quiz.questions[i-1].passage !== q.passage);
                 return (
@@ -255,7 +272,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
             )}
           </div>
           
-          {/* Footer Preview Digital */}
           <div className="mt-16 pt-4 border-t border-gray-100 text-[8pt] text-gray-400 italic flex justify-between no-print">
             <span>GenZ QuizGen Pro - AI Powered Academic Engine v3.1.0</span>
             <span>Doc ID: {quiz.id.substring(0,8).toUpperCase()}</span>
