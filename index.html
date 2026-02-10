@@ -19,8 +19,9 @@
                 processEscapes: true 
             },
             svg: { 
-                fontCache: 'none', // WAJIB 'none' agar simbol matematika tidak hilang di PDF
-                minScale: 100
+                fontCache: 'none', // WAJIB: Mencegah simbol hilang saat konversi ke PDF
+                minScale: 100,
+                displayAlign: 'left'
             },
             options: { 
                 enableMenu: false, 
@@ -53,16 +54,17 @@
         .font-zh { font-family: 'Noto Sans TC', sans-serif; }
         .orange-gradient { background: linear-gradient(135deg, #ff8c00 0%, #ff4500 100%); }
         
+        /* MathJax Container Fix */
         mjx-container { 
             display: inline-block !important; 
             vertical-align: middle !important; 
             margin: 0 0.1em !important; 
-            line-height: normal !important;
+            line-height: 0 !important;
             max-width: 100% !important;
         }
 
-        /* Container A4 / F4 Setup */
-        /* Margin 2.2cm = 22mm */
+        /* Container Cetak / Preview A4 */
+        /* Width A4 = 210mm. Margin 2.2cm = 22mm */
         .print-container {
             width: 210mm !important;
             min-height: 297mm;
@@ -72,14 +74,15 @@
             box-sizing: border-box !important;
             position: relative;
             color: black;
-            box-shadow: 0 0 40px rgba(0,0,0,0.1);
-            overflow: visible !important; /* Mencegah soal terpotong saat capture */
+            box-shadow: 0 0 50px rgba(0,0,0,0.1);
+            overflow: visible !important; /* Penting agar snapshot tidak terpotong */
         }
 
-        /* Khusus saat proses ekspor berlangsung */
+        /* Mode Ekspor: Menghilangkan shadow dan margin untuk presisi capture */
         .exporting .print-container {
             box-shadow: none !important;
             margin: 0 !important;
+            width: 210mm !important;
         }
 
         .fixed-table {
@@ -91,7 +94,7 @@
 
         @media print {
             @page { size: A4 portrait; margin: 0; }
-            body { background: white !important; }
+            body { background: white !important; overflow: visible !important; }
             #root > *:not(.print-modal-wrapper) { display: none !important; }
             .no-print { display: none !important; }
             
@@ -109,12 +112,13 @@
                 page-break-inside: avoid !important;
                 width: 100% !important;
                 display: block !important;
+                margin-bottom: 1rem;
             }
         }
 
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #fed7aa; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #fff7ed; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #fed7aa; border-radius: 20px; }
     </style>
 <script type="importmap">
 {
