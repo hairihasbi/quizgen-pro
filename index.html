@@ -149,7 +149,10 @@
             }
             body { background: white !important; margin: 0 !important; padding: 0 !important; }
             .no-print { display: none !important; }
-            #root > *:not(.print-container) { display: none !important; }
+            
+            /* CSS Fix: Jangan sembunyikan root secara brutal, sembunyikan element non-print saja */
+            header, aside, .no-print-area { display: none !important; }
+            
             .print-container {
                 display: block !important;
                 position: relative !important;
@@ -158,6 +161,7 @@
                 padding: 0 !important;
                 background: white !important;
                 color: black !important;
+                box-shadow: none !important;
             }
             .print-watermark {
                 display: block !important;
@@ -201,11 +205,9 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
 </head>
 <body>
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
-<script type="module" src="/index.tsx"></script>
 </body>
 </html>
