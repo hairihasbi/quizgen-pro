@@ -10,25 +10,6 @@
     
     <script>
         // Global Batching Queue for MathJax
-        let mathQueue = [];
-        let mathTimeout = null;
-
-        const processMathQueue = () => {
-            if (mathQueue.length === 0) return;
-            const targets = [...mathQueue];
-            mathQueue = [];
-            if (window.MathJax && window.MathJax.typesetPromise) {
-                window.MathJax.typesetPromise(targets)
-                .then(() => {
-                    targets.forEach(el => el.classList.remove('math-loading'));
-                })
-                .catch(err => {
-                    console.error('MathJax Batch Error:', err);
-                    targets.forEach(el => el.classList.remove('math-loading'));
-                });
-            }
-        };
-
         window.MathJax = {
             tex: {
                 inlineMath: [['$', '$'], ['\\(', '\\)']],
@@ -51,12 +32,24 @@
             }
         };
 
+        let mathQueue = [];
+        let mathTimeout = null;
+
+        const processMathQueue = () => {
+            if (mathQueue.length === 0) return;
+            const targets = [...mathQueue];
+            mathQueue = [];
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise(targets)
+                .catch(err => console.error('MathJax Batch Error:', err));
+            }
+        };
+
         window.mathObserver = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
                     mathQueue.push(entry.target);
                     window.mathObserver.unobserve(entry.target);
-                    
                     if (mathTimeout) clearTimeout(mathTimeout);
                     mathTimeout = setTimeout(processMathQueue, 100);
                 }
@@ -66,12 +59,10 @@
         window.observeMathItems = (containerId) => {
             const container = containerId ? document.getElementById(containerId) : document.body;
             if (!container) return;
-            const items = container.querySelectorAll('.mjx-item');
-            items.forEach(item => window.mathObserver.observe(item));
+            container.querySelectorAll('.mjx-item').forEach(item => window.mathObserver.observe(item));
         };
     </script>
     <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
     
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #fffaf0; }
@@ -85,50 +76,9 @@
             display: inline-block !important;
             vertical-align: middle !important;
             margin: 0 0.15em !important;
-            position: relative !important;
-            top: -0.05em !important;
             line-height: 0 !important;
-            overflow: visible !important;
         }
         
-        mjx-container > svg {
-            max-width: 100%;
-            height: auto;
-        }
-        
-        mjx-container[display="true"] {
-            display: block !important;
-            margin: 1.5em 0 !important;
-            text-align: left !important;
-            padding: 10px 0;
-            top: 0 !important;
-        }
-
-        .mjx-item {
-            line-height: 1.85 !important;
-            text-align: justify;
-            word-wrap: break-word;
-            text-rendering: optimizeLegibility;
-            min-height: 1.5em;
-        }
-
-        .math-loading {
-            color: transparent !important;
-            user-select: none;
-            pointer-events: none;
-            background: linear-gradient(90deg, #f3f4f6 25%, #f9fafb 50%, #f3f4f6 75%);
-            background-size: 200% 100%;
-            animation: math-shimmer 2s infinite linear;
-            border-radius: 8px;
-            display: inline-block;
-            min-width: 120px;
-        }
-
-        @keyframes math-shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
-
         .options-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -140,59 +90,54 @@
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #ff8c00; border-radius: 10px; }
 
-        .print-watermark { display: none; }
-        
         @media print {
             @page {
-                margin: 10mm 15mm;
                 size: A4 portrait;
+                margin: 15mm; /* Margin standar A4 */
             }
             
-            /* GLOBAL RESET UNTUK MENCEGAH BLANK */
+            /* Sembunyikan semua elemen kecuali modal yang sedang aktif */
+            #root > *:not(.print-modal-wrapper) {
+                display: none !important;
+            }
+
             html, body {
                 height: auto !important;
                 overflow: visible !important;
                 background: white !important;
                 margin: 0 !important;
                 padding: 0 !important;
-                visibility: hidden; /* Sembunyikan semuanya dulu */
+                width: 100% !important;
             }
 
-            /* Tampilkan hanya area cetak soal */
-            .print-modal-wrapper, .print-modal-wrapper * {
-                visibility: visible;
-            }
-
-            /* Sembunyikan elemen UI di dalam wrapper soal */
-            .no-print, header, .no-print-area {
-                display: none !important;
-                visibility: hidden !important;
-            }
-
-            /* Posisi wrapper harus direset agar mendukung banyak halaman */
             .print-modal-wrapper {
                 position: absolute !important;
-                left: 0 !important;
                 top: 0 !important;
+                left: 0 !important;
                 width: 100% !important;
                 height: auto !important;
-                display: block !important;
-                background: white !important;
                 padding: 0 !important;
                 margin: 0 !important;
-                box-shadow: none !important;
+                display: block !important;
+                background: white !important;
+                z-index: 9999 !important;
+            }
+
+            .no-print {
+                display: none !important;
             }
 
             .print-scroll-container {
                 overflow: visible !important;
                 height: auto !important;
-                display: block !important;
                 padding: 0 !important;
                 margin: 0 !important;
+                display: block !important;
             }
 
             .print-container {
                 width: 100% !important;
+                max-width: 100% !important;
                 margin: 0 !important;
                 padding: 0 !important;
                 border: none !important;
@@ -200,25 +145,18 @@
                 display: block !important;
             }
 
+            /* Hindari soal terpotong di tengah halaman */
             .pdf-block {
                 break-inside: avoid;
                 page-break-inside: avoid;
                 margin-bottom: 2rem;
-                border-bottom: 1px solid #eee;
-                padding-bottom: 1rem;
+                padding: 0 !important;
             }
 
-            .print-watermark {
-                display: block !important;
-                position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%) rotate(-45deg);
-                font-size: 80pt;
-                font-weight: 900;
-                color: rgba(0, 0, 0, 0.02) !important;
-                z-index: -1;
-                pointer-events: none;
+            /* Pastikan teks hitam pekat untuk hasil cetak terbaik */
+            .print-container * {
+                color: black !important;
+                text-shadow: none !important;
             }
         }
     </style>
@@ -231,10 +169,9 @@
     "@google/genai": "https://esm.sh/@google/genai@^1.40.0",
     "@libsql/client": "https://esm.sh/@libsql/client@^0.17.0",
     "crypto": "https://esm.sh/crypto@^1.0.1",
-    "next/": "https://esm.sh/next@^16.1.6/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
     "vite": "https://esm.sh/vite@^7.3.1",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.3",
-    "lucide-react": "https://esm.sh/lucide-react@^0.563.0"
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4"
   }
 }
 </script>
