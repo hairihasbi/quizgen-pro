@@ -17,6 +17,7 @@ export const DokuService = {
       const data = await response.json();
 
       if (!response.ok) {
+        // PERBAIKAN: Ambil detail pesan error dari body response API kita
         throw new Error(data.message || "Gagal mendapatkan akses ke DOKU.");
       }
 
@@ -24,7 +25,7 @@ export const DokuService = {
         return data.response.payment.url;
       }
       
-      throw new Error("DOKU tidak mengembalikan URL pembayaran.");
+      throw new Error("DOKU tidak mengembalikan URL pembayaran. Periksa konfigurasi Gateway.");
     } catch (error: any) {
       console.error("Doku Service Error:", error.message);
       throw error;
