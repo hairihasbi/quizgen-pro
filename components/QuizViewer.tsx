@@ -62,41 +62,54 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
 
   const handleDownloadPdf = async () => {
     const element = document.getElementById('quiz-print-area');
+    const scrollContainer = document.querySelector('.print-scroll-container');
     if (!element) return;
 
     setIsDownloading(true);
 
     try {
-      // 1. Sinkronisasi paksa MathJax
+      // 1. Reset Scroll agar snapshot stabil
+      if (scrollContainer) scrollContainer.scrollTop = 0;
+
+      // 2. Sinkronisasi paksa MathJax dengan area spesifik
       if ((window as any).MathJax && (window as any).MathJax.typesetPromise) {
-        // Render elemen spesifik
         await (window as any).MathJax.typesetPromise([element]);
-        // Berikan waktu tambahan untuk browser melukis SVG
-        await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 1000)));
       }
 
-      // 2. Konfigurasi Presisi A4
+      // 3. AGGRESSIVE SYNC: Menunggu browser melakukan 'Repaint' penuh pada formula SVG
+      // Kita gunakan loop requestAnimationFrame untuk menjamin siklus render browser selesai
+      await new Promise(resolve => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setTimeout(resolve, 2000); // Memberikan 2 detik untuk formula kompleks
+          });
+        });
+      });
+
+      // 4. Konfigurasi Presisi A4 dengan Margin Internal 2.2cm
       const opt = {
-        margin: 10,
+        margin: 0, // Margin PDF nol karena kita pakai padding CSS 22mm di elemen
         filename: `Quiz_${quiz.title.replace(/\s+/g, '_')}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
+        image: { type: 'jpeg', quality: 1.0 },
         html2canvas: { 
-          scale: 2, 
+          scale: 2.5, // Meningkatkan DPI agar formula tajam
           useCORS: true, 
           logging: false,
           letterRendering: true,
-          windowWidth: 794, // Presisi lebar A4 dalam px (96dpi)
+          windowWidth: 794, // Kunci lebar window di standar pixel A4 96dpi
+          scrollY: 0,
+          scrollX: 0
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'], avoid: ['.pdf-block', 'tr', 'h1', 'h2', 'h3'] }
+        pagebreak: { mode: ['css', 'legacy'], avoid: ['.pdf-block', 'tr', 'h1', 'h2', 'h3', '.identitas-box'] }
       };
 
-      // 3. Eksekusi Save
+      // 5. Eksekusi Save
       const worker = (window as any).html2pdf().from(element).set(opt);
       await worker.save();
     } catch (err) {
       console.error("PDF Download Error:", err);
-      alert("Gagal mengunduh PDF. Coba gunakan fitur 'Cetak' (Ctrl+P) dan pilih 'Save as PDF'.");
+      alert("Gagal mengunduh PDF. Pastikan seluruh formula matematika muncul dengan benar di layar sebelum mengklik unduh.");
     } finally {
       setIsDownloading(false);
     }
@@ -157,18 +170,19 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
       </header>
 
       <div className="flex-1 overflow-y-auto p-0 md:p-10 flex justify-center custom-scrollbar print-scroll-container">
-        <div id="quiz-print-area" className="print-container bg-white shadow-2xl text-gray-900 w-[210mm] min-h-screen py-[15mm] px-[20mm] box-border print:py-0 print:px-0">
+        {/* Kontainer Utama dengan Lebar A4 Standar & Padding 2.2cm */}
+        <div id="quiz-print-area" className="print-container bg-white shadow-2xl text-gray-900 w-[210mm] min-h-screen box-border overflow-hidden">
           
           {/* HEADER / KOP SOAL */}
           <div className="border-b-[4px] border-double border-gray-900 pb-3 mb-6 text-center w-full box-border">
-             <h1 className="text-2xl font-black uppercase tracking-tight text-gray-900">{quiz.title}</h1>
+             <h1 className="text-2xl font-black uppercase tracking-tight text-gray-900 leading-tight">{quiz.title}</h1>
              <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-gray-600 mt-1">
                 {quiz.subject} | {quiz.level} {quiz.grade}
              </div>
           </div>
 
-          {/* DATA SISWA - Fix Garis & Margin */}
-          <div className="grid grid-cols-2 gap-x-8 gap-y-4 p-5 border-[2.5px] border-gray-900 rounded-xl mb-8 w-full box-border mx-auto">
+          {/* DATA SISWA - Menggunakan width 100% dan box-sizing border-box agar tidak meluber */}
+          <div className="identitas-box grid grid-cols-2 gap-x-8 gap-y-4 p-5 border-[3px] border-gray-900 rounded-xl mb-8 w-full box-border">
              <div className="flex items-center gap-3">
                 <span className="w-16 shrink-0 font-black text-[10px] text-gray-600 uppercase">NAMA</span>
                 <span className="font-black text-gray-900">:</span>
@@ -216,9 +230,9 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                           <div className="flex-1 min-w-0">
                             <div className={`mjx-item text-gray-900 font-bold leading-relaxed text-[13px] text-justify pb-2 w-full break-words ${getFontClass(quiz.subject)}`} dangerouslySetInnerHTML={{ __html: sanitizeHTML(q.text) }}></div>
                             {q.options && (
-                              <div className="options-grid w-full">
+                              <div className="options-grid w-full box-border">
                                 {q.options.map(opt => (
-                                  <div key={opt.label} className="flex gap-2 items-start w-full overflow-hidden">
+                                  <div key={opt.label} className="flex gap-2 items-start w-full overflow-hidden box-border">
                                     <span className="font-black text-gray-900 w-6 h-6 flex items-center justify-center rounded-lg border border-gray-400 text-[10px] shrink-0">{opt.label}</span>
                                     <div className={`mjx-item font-semibold text-gray-800 text-[12px] pt-0.5 flex-1 min-w-0 ${getFontClass(quiz.subject)}`} dangerouslySetInnerHTML={{ __html: sanitizeHTML(opt.text) }}></div>
                                   </div>
@@ -239,32 +253,32 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
               </div>
             )}
 
-            {/* TABEL KISI-KISI - Fix Overflow & Page Break */}
+            {/* TABEL KISI-KISI - Diperbaiki dengan table-fixed dan lebar kolom persentase presisi */}
             {exportMode === 'kisi-kisi' && (
-              <div className="mt-8 w-full box-border">
+              <div className="mt-8 w-full box-border overflow-hidden">
                 <h3 className="text-lg font-black text-gray-900 uppercase border-b-2 border-gray-900 mb-6 pb-2 text-center">Kisi-kisi Instrumen Penilaian</h3>
-                <table className="w-full border-collapse border-2 border-gray-900 text-[9px] table-fixed">
+                <table className="w-full border-collapse border-[2.5px] border-gray-900 text-[9px] table-fixed box-border">
                   <thead>
                     <tr className="bg-gray-100 print:bg-gray-50">
-                      <th className="border border-gray-900 p-1 w-[30px] text-center font-black uppercase">No</th>
-                      <th className="border border-gray-900 p-1 text-center w-[120px] font-black uppercase">KD / TP</th>
-                      <th className="border border-gray-900 p-1 text-center w-[90px] font-black uppercase">Materi</th>
-                      <th className="border border-gray-900 p-1 text-center font-black uppercase">Indikator</th>
-                      <th className="border border-gray-900 p-1 w-[50px] text-center font-black uppercase">Level</th>
-                      <th className="border border-gray-900 p-1 w-[70px] text-center font-black uppercase">Bentuk</th>
+                      <th className="border-2 border-gray-900 p-1 w-[8%] text-center font-black uppercase">No</th>
+                      <th className="border-2 border-gray-900 p-1 text-center w-[22%] font-black uppercase">KD / TP</th>
+                      <th className="border-2 border-gray-900 p-1 text-center w-[18%] font-black uppercase">Materi</th>
+                      <th className="border-2 border-gray-900 p-1 text-center w-[28%] font-black uppercase">Indikator</th>
+                      <th className="border-2 border-gray-900 p-1 w-[10%] text-center font-black uppercase">Level</th>
+                      <th className="border-2 border-gray-900 p-1 w-[14%] text-center font-black uppercase">Bentuk</th>
                     </tr>
                   </thead>
                   <tbody>
                     {quiz.questions.map((q, i) => (
                       <tr key={q.id} className="pdf-block">
-                        <td className="border border-gray-900 p-1.5 text-center font-bold">{i + 1}</td>
-                        <td className="border border-gray-900 p-1.5 text-justify leading-tight">{q.competency || "-"}</td>
-                        <td className="border border-gray-900 p-1.5 text-center leading-tight">{q.topic || "-"}</td>
-                        <td className="border border-gray-900 p-1.5 text-justify leading-relaxed break-words">
+                        <td className="border-2 border-gray-900 p-2 text-center font-bold">{i + 1}</td>
+                        <td className="border-2 border-gray-900 p-2 text-justify leading-tight">{q.competency || "-"}</td>
+                        <td className="border-2 border-gray-900 p-2 text-center leading-tight">{q.topic || "-"}</td>
+                        <td className="border-2 border-gray-900 p-2 text-justify leading-relaxed break-words">
                           <div className="mjx-item">{q.indicator}</div>
                         </td>
-                        <td className="border border-gray-900 p-1.5 text-center whitespace-nowrap">{getCognitiveLevelMapping(q.cognitiveLevel)}</td>
-                        <td className="border border-gray-900 p-1.5 text-center">{q.type}</td>
+                        <td className="border-2 border-gray-900 p-2 text-center whitespace-nowrap">{getCognitiveLevelMapping(q.cognitiveLevel)}</td>
+                        <td className="border-2 border-gray-900 p-2 text-center">{q.type}</td>
                       </tr>
                     ))}
                   </tbody>
