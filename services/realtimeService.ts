@@ -31,14 +31,15 @@ export class RealtimeService {
     }
 
     try {
-      this.socket = new WebSocket(socketUrl);
+      const ws = new WebSocket(socketUrl);
+      this.socket = ws;
 
-      this.socket.onopen = () => {
+      ws.onopen = () => {
         console.log(`[WS] Secure Link Established to ${channelId}`);
         this.reconnectionAttempts = 0;
       };
 
-      this.socket.onmessage = (event) => {
+      ws.onmessage = (event) => {
         try {
           const data: AIProgressEvent = JSON.parse(event.data);
           if (this.onMessageCallback) this.onMessageCallback(data);
@@ -47,11 +48,11 @@ export class RealtimeService {
         }
       };
 
-      this.socket.onerror = (error) => {
+      ws.onerror = (error) => {
         console.error("[WS] Socket Exception:", error);
       };
 
-      this.socket.onclose = () => {
+      ws.onclose = () => {
         if (this.reconnectionAttempts < this.maxReconnectionAttempts) {
           this.reconnectionAttempts++;
           setTimeout(() => this.connect(channelId, onMessage), 2000);
