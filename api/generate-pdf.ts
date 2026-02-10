@@ -17,12 +17,25 @@ export default async function handler(req: any, res: any) {
 
     const page = await browser.newPage();
 
-    // Template HTML High-Quality untuk PDF
+    // Template HTML High-Quality dengan sinkronisasi MathJax yang ketat
     const htmlContent = `
     <!DOCTYPE html>
     <html lang="id">
     <head>
       <meta charset="UTF-8">
+      <script>
+        window.MathJax = {
+          tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+          svg: { fontCache: 'none' },
+          startup: {
+            typeset: false,
+            ready: () => {
+              MathJax.startup.defaultReady();
+              window.mathjaxReady = MathJax.typesetPromise();
+            }
+          }
+        };
+      </script>
       <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&family=Noto+Serif:ital,wght@0,400;0,700;1,400&display=swap');
@@ -30,12 +43,11 @@ export default async function handler(req: any, res: any) {
         body { 
           font-family: 'Noto Serif', serif; 
           margin: 0; padding: 0; background: white; color: black;
-          -webkit-print-color-adjust: exact;
+          line-height: 1.5;
         }
 
         .page {
           width: 210mm;
-          min-height: 297mm;
           padding: 20mm 15mm;
           margin: 0 auto;
           box-sizing: border-box;
@@ -47,24 +59,24 @@ export default async function handler(req: any, res: any) {
         .header-line { border-top: 3px solid black; border-bottom: 1px solid black; height: 4px; margin: 10px 0 20px 0; }
 
         .info-table { width: 100%; border-collapse: collapse; font-size: 10pt; margin-bottom: 20px; font-weight: 700; }
-        .info-table td { padding: 3px 0; }
+        .info-table td { padding: 4px 0; }
 
-        .section-title { font-size: 11pt; font-weight: 800; text-decoration: underline; text-transform: uppercase; margin-bottom: 15px; text-align: center; font-family: 'Plus Jakarta Sans', sans-serif; }
+        .section-title { font-size: 11pt; font-weight: 800; text-decoration: underline; text-transform: uppercase; margin-bottom: 20px; text-align: center; font-family: 'Plus Jakarta Sans', sans-serif; }
 
-        .question-item { margin-bottom: 20px; page-break-inside: avoid; display: flex; gap: 10px; font-size: 11pt; line-height: 1.5; }
+        .question-item { margin-bottom: 25px; page-break-inside: avoid; display: flex; gap: 12px; font-size: 11pt; }
         .q-num { font-weight: 700; min-width: 25px; text-align: right; }
         .q-body { flex: 1; text-align: justify; }
         
-        .passage { background: #f9f9f9; border: 1px solid #000; padding: 15px; margin: 10px 0 20px 0; font-style: italic; font-size: 10pt; }
+        .passage { background: #fdfdfd; border: 1.5px solid #000; padding: 15px; margin: 15px 0; font-style: italic; font-size: 10.5pt; page-break-inside: avoid; }
 
-        .option { display: flex; gap: 8px; margin-top: 4px; }
-        .opt-label { font-weight: 700; min-width: 18px; }
+        .option { display: flex; gap: 8px; margin-top: 6px; }
+        .opt-label { font-weight: 700; min-width: 20px; }
 
-        .answer-key { margin-top: 10px; padding: 10px; background: #f0f0f0; border: 1px dashed #666; font-size: 9pt; }
+        .answer-key { margin-top: 15px; padding: 12px; background: #f9f9f9; border: 1px dashed #444; font-size: 9.5pt; border-radius: 8px; }
 
-        mjx-container { display: inline-block !important; vertical-align: middle; margin: 0 2px; }
-        .mjx-ready body { opacity: 1 !important; }
-        body { opacity: 0; transition: opacity 0.5s; }
+        /* Fix MathJax SVG Alignment */
+        mjx-container { display: inline-block !important; vertical-align: middle; margin: 0 2px !important; }
+        svg { vertical-align: middle !important; }
       </style>
     </head>
     <body>
@@ -77,40 +89,40 @@ export default async function handler(req: any, res: any) {
 
         <table class="info-table">
           <tr>
-            <td width="15%">Topik</td><td width="2%">:</td><td width="43%">${quiz.topic}</td>
+            <td width="15%">Materi</td><td width="2%">:</td><td width="43%">${quiz.topic}</td>
             <td width="15%" align="right">Waktu</td><td width="2%">:</td><td width="23%">90 Menit</td>
           </tr>
           <tr>
-            <td>Jenjang</td><td>:</td><td>${quiz.level}</td>
-            <td align="right">Jumlah</td><td>:</td><td>${quiz.questions.length} Soal</td>
+            <td>Jenjang</td><td>:</td><td>${quiz.level} / ${quiz.grade}</td>
+            <td align="right">Jumlah</td><td>:</td><td>${quiz.questions.length} Butir Soal</td>
           </tr>
         </table>
 
-        <div class="section-title">URAIAN SOAL</div>
+        <div class="section-title">DAFTAR BUTIR SOAL</div>
 
         <div class="questions">
           ${quiz.questions.map((q: any, i: number) => {
             const isNewPassage = q.passage && (i === 0 || quiz.questions[i-1].passage !== q.passage);
             return `
-              ${isNewPassage ? `<div class="passage"><strong>STIMULUS:</strong><br/>${q.passage}</div>` : ''}
+              ${isNewPassage ? `<div class="passage"><strong>STIMULUS WACANA:</strong><br/>${q.passage}</div>` : ''}
               <div class="question-item">
                 <div class="q-num">${i + 1}.</div>
                 <div class="q-body">
-                  <div>${q.text}</div>
-                  ${q.options ? `
-                    <div style="margin-top: 8px;">
+                  <div class="text-content">${q.text}</div>
+                  ${q.options && q.options.length > 0 ? `
+                    <div class="options-container" style="margin-top: 10px;">
                       ${q.options.map((opt: any) => `
                         <div class="option">
                           <span class="opt-label">${opt.label}.</span>
-                          <span>${opt.text}</span>
+                          <span class="opt-text">${opt.text}</span>
                         </div>
                       `).join('')}
                     </div>
                   ` : ''}
                   ${showAnswer ? `
                     <div class="answer-key">
-                      <strong>KUNCI: ${Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</strong><br/>
-                      <em>Pembahasan: ${q.explanation}</em>
+                      <strong style="color: #c2410c;">KUNCI JAWABAN: ${Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</strong><br/>
+                      <div style="margin-top: 5px; color: #444;"><em>Pembahasan: ${q.explanation}</em></div>
                     </div>
                   ` : ''}
                 </div>
@@ -119,35 +131,24 @@ export default async function handler(req: any, res: any) {
           }).join('')}
         </div>
       </div>
-
-      <script>
-        window.MathJax = {
-          startup: {
-            pageReady: () => {
-              return MathJax.startup.defaultPageReady().then(() => {
-                document.body.classList.add('mjx-ready');
-              });
-            }
-          }
-        };
-      </script>
     </body>
     </html>
     `;
 
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
     
-    // Tunggu Rendering MathJax (Ditambah menjadi 30 detik untuk soal kompleks)
-    try {
-      await page.waitForSelector('.mjx-ready', { timeout: 30000 });
-    } catch (e) {
-      console.warn("MathJax timeout, continuing with current render.");
-    }
+    // WAJIB: Tunggu MathJax menyelesaikan typesetting rumusnya
+    await page.evaluate(async () => {
+      if ((window as any).mathjaxReady) await (window as any).mathjaxReady;
+    });
+
+    // Beri jeda kecil ekstra untuk memastikan SVG benar-benar ter-render di engine chrome
+    await new Promise(r => setTimeout(r, 2500));
 
     const pdfBuffer = await page.pdf({
       format: 'A4',
       printBackground: true,
-      margin: { top: 0, right: 0, bottom: 0, left: 0 }
+      margin: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' }
     });
 
     await browser.close();
