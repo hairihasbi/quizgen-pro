@@ -15,7 +15,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingDocs, setIsExportingDocs] = useState(false);
 
-  // Efek khusus untuk registrasi MathJax Observer
   useEffect(() => {
     const timer = setTimeout(() => {
       if ((window as any).observeMathItems) {
@@ -52,7 +51,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
   };
 
   const handleNativePrint = async () => {
-    // Beri waktu sejenak agar UI benar-benar siap
     if ((window as any).MathJax && (window as any).MathJax.typesetPromise) {
         const items = document.querySelectorAll('.mjx-item');
         await (window as any).MathJax.typesetPromise(Array.from(items));
@@ -87,8 +85,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
   return (
     <div className="fixed inset-0 bg-orange-50/95 backdrop-blur-2xl z-[500] flex flex-col p-4 md:p-8 animate-in zoom-in-95 duration-300 print-modal-wrapper" role="dialog">
       
-      {/* Tombol Kontrol (Disembunyikan saat print via .no-print) */}
-      <header className="flex flex-col lg:flex-row justify-between items-center bg-white p-5 rounded-[2.5rem] shadow-xl shadow-orange-100/50 mb-6 border border-orange-100 gap-4 no-print text-gray-900">
+      <header className="flex flex-col lg:flex-row justify-between items-center bg-white p-5 rounded-[2.5rem] shadow-xl shadow-orange-100/50 mb-6 border border-orange-100 gap-4 no-print">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 orange-gradient rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg">📄</div>
           <div>
@@ -106,17 +103,15 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
           <button onClick={handleExportToGoogleDocs} disabled={isExportingDocs} className="px-6 py-3 bg-[#4285f4] text-white rounded-2xl text-[10px] font-black shadow-xl uppercase transition-all hover:scale-105">📄 Docs</button>
           <button onClick={handleExportToGoogleForms} disabled={isExporting} className="px-6 py-3 bg-[#673ab7] text-white rounded-2xl text-[10px] font-black shadow-xl uppercase transition-all hover:scale-105">📝 Forms</button>
           <button onClick={handleNativePrint} className="px-6 py-3 orange-gradient text-white rounded-2xl text-[10px] font-black shadow-xl uppercase transition-all hover:scale-105">🖨️ Cetak</button>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center text-orange-300 hover:text-red-500 bg-orange-100/50 rounded-full">✕</button>
+          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center text-orange-300 hover:text-red-500 bg-orange-100/50 rounded-full transition-colors">✕</button>
         </div>
       </header>
 
-      {/* Kontainer Scrollable yang akan dipaksa Static saat Print */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-10 flex justify-center custom-scrollbar bg-orange-100/20 rounded-[3rem] print-scroll-container">
-        <div id="quiz-print-area" className="print-container bg-white shadow-2xl transition-all duration-500 text-gray-900 w-full md:w-[210mm] min-h-screen py-[15mm]">
-          <div className="print-watermark">GENZ QUIZGEN PRO</div>
-
-          {/* KOP SOAL */}
-          <div className="pdf-block px-[20mm] border-none">
+      <div className="flex-1 overflow-y-auto p-0 md:p-10 flex justify-center custom-scrollbar print-scroll-container">
+        <div id="quiz-print-area" className="print-container bg-white shadow-2xl text-gray-900 w-full md:w-[210mm] min-h-screen py-[10mm] px-[0mm] print:py-0 print:px-0">
+          
+          {/* HEADER / KOP SOAL */}
+          <div className="pdf-block px-[10mm] print:px-0">
              <div className="border-b-4 border-double border-gray-900 pb-4 mb-6 text-center">
                 <h1 className="text-2xl font-black uppercase tracking-tight text-gray-900">{quiz.title}</h1>
                 <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-gray-600 mt-1">
@@ -124,7 +119,8 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                 </div>
              </div>
 
-             <div className="grid grid-cols-2 gap-x-12 gap-y-4 p-6 border-2 border-gray-900 rounded-2xl bg-gray-50/30 print:bg-white">
+             {/* DATA SISWA */}
+             <div className="grid grid-cols-2 gap-x-8 gap-y-4 p-6 border-2 border-gray-900 rounded-2xl mb-8">
                 <div className="flex items-center gap-3">
                    <span className="w-20 shrink-0 font-black text-[11px] text-gray-500 uppercase">NAMA</span>
                    <span className="font-black text-gray-900">:</span>
@@ -148,8 +144,8 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
              </div>
           </div>
 
-          {/* DAFTAR SOAL */}
-          <div className="px-[20mm]">
+          {/* AREA SOAL */}
+          <div className="px-[10mm] print:px-0">
             {(exportMode === 'soal' || exportMode === 'lengkap') && (
               <div className="space-y-0">
                 {quiz.questions.map((q, i) => {
@@ -157,9 +153,9 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                   const isNewType = i === 0 || quiz.questions[i-1].type !== q.type;
                   
                   return (
-                    <div key={q.id} className="mjx-item math-loading pdf-block py-6">
+                    <div key={q.id} className="mjx-item pdf-block py-4">
                         {isNewType && (
-                          <div className="mb-6 mt-4">
+                          <div className="mb-4 mt-2">
                             <h3 className="text-[11px] font-black text-gray-900 uppercase tracking-[0.15em] border-l-4 border-gray-900 pl-3">
                               BAGIAN: {q.type.toUpperCase()}
                             </h3>
@@ -171,7 +167,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                         <div className="flex gap-4 items-start">
                           <span className="font-black text-gray-900 text-[14px] mt-0.5 w-8 shrink-0">{i + 1}.</span>
                           <div className="flex-1">
-                            <div className={`text-gray-900 font-bold leading-relaxed text-[14px] text-justify pb-4 ${getFontClass(quiz.subject)}`} dangerouslySetInnerHTML={{ __html: sanitizeHTML(q.text) }}></div>
+                            <div className={`text-gray-900 font-bold leading-relaxed text-[14px] text-justify pb-2 ${getFontClass(quiz.subject)}`} dangerouslySetInnerHTML={{ __html: sanitizeHTML(q.text) }}></div>
                             {q.options && (
                               <div className="options-grid">
                                 {q.options.map(opt => (
@@ -198,7 +194,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
 
             {/* TABEL KISI-KISI */}
             {exportMode === 'kisi-kisi' && (
-              <div className="pdf-block mt-8 border-none">
+              <div className="pdf-block mt-8">
                 <h3 className="text-lg font-black text-gray-900 uppercase border-b-2 border-gray-900 mb-6 pb-2 text-center">Kisi-kisi Instrumen Penilaian</h3>
                 <table className="w-full border-collapse border-2 border-gray-900 text-[10px]">
                   <thead>
@@ -217,7 +213,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                         <td className="border border-gray-900 p-2 text-center font-bold">{i + 1}</td>
                         <td className="border border-gray-900 p-2 text-justify leading-tight">{q.competency || "-"}</td>
                         <td className="border border-gray-900 p-2 text-center leading-tight">{q.topic || "-"}</td>
-                        <td className="mjx-item math-loading border border-gray-900 p-2 text-justify leading-relaxed">{q.indicator}</td>
+                        <td className="mjx-item border border-gray-900 p-2 text-justify leading-relaxed">{q.indicator}</td>
                         <td className="border border-gray-900 p-2 text-center whitespace-nowrap">{getCognitiveLevelMapping(q.cognitiveLevel)}</td>
                         <td className="border border-gray-900 p-2 text-center">{q.type}</td>
                       </tr>
