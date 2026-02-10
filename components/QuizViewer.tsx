@@ -14,6 +14,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
   const [exportMode, setExportMode] = useState<'soal' | 'kisi-kisi' | 'lengkap'>('soal');
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingDocs, setIsExportingDocs] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -55,7 +56,39 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
         const items = document.querySelectorAll('.mjx-item');
         await (window as any).MathJax.typesetPromise(Array.from(items));
     }
-    window.print();
+    setTimeout(() => {
+      window.print();
+    }, 500);
+  };
+
+  const handleDownloadPdf = async () => {
+    const element = document.getElementById('quiz-print-area');
+    if (!element) return;
+
+    setIsDownloading(true);
+
+    // Pastikan MathJax ter-render
+    if ((window as any).MathJax && (window as any).MathJax.typesetPromise) {
+      await (window as any).MathJax.typesetPromise(Array.from(element.querySelectorAll('.mjx-item')));
+    }
+
+    const opt = {
+      margin: 15,
+      filename: `Quiz_${quiz.title.replace(/\s+/g, '_')}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+
+    try {
+      await (window as any).html2pdf().from(element).set(opt).save();
+    } catch (err) {
+      console.error("PDF Download Error:", err);
+      alert("Gagal mengunduh PDF. Gunakan tombol 'Cetak' sebagai alternatif.");
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const handleExportToGoogleForms = async () => {
@@ -102,6 +135,12 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
           </div>
           <button onClick={handleExportToGoogleDocs} disabled={isExportingDocs} className="px-6 py-3 bg-[#4285f4] text-white rounded-2xl text-[10px] font-black shadow-xl uppercase transition-all hover:scale-105">📄 Docs</button>
           <button onClick={handleExportToGoogleForms} disabled={isExporting} className="px-6 py-3 bg-[#673ab7] text-white rounded-2xl text-[10px] font-black shadow-xl uppercase transition-all hover:scale-105">📝 Forms</button>
+          
+          {/* Tombol Download PDF Baru */}
+          <button onClick={handleDownloadPdf} disabled={isDownloading} className="px-6 py-3 bg-gray-800 text-white rounded-2xl text-[10px] font-black shadow-xl uppercase transition-all hover:scale-105 flex items-center gap-2">
+            {isDownloading ? <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin"></div> : '📥'} Download
+          </button>
+
           <button onClick={handleNativePrint} className="px-6 py-3 orange-gradient text-white rounded-2xl text-[10px] font-black shadow-xl uppercase transition-all hover:scale-105">🖨️ Cetak</button>
           <button onClick={onClose} className="w-10 h-10 flex items-center justify-center text-orange-300 hover:text-red-500 bg-orange-100/50 rounded-full transition-colors">✕</button>
         </div>
