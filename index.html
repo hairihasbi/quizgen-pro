@@ -8,7 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Amiri&family=Noto+Sans+JP&family=Noto+Serif+KR&family=Noto+Sans+TC&display=swap" rel="stylesheet">
     
-    <!-- Library untuk Save PDF Langsung -->
+    <!-- Library untuk Save PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <script>
@@ -57,78 +57,57 @@
         .font-zh { font-family: 'Noto Sans TC', sans-serif; }
         .orange-gradient { background: linear-gradient(135deg, #ff8c00 0%, #ff4500 100%); }
         
-        mjx-container { display: inline-block !important; vertical-align: middle !important; margin: 0 0.15em !important; line-height: 0 !important; }
-        .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 3rem; margin-top: 1rem; }
+        /* Fix MathJax Inline Spacing */
+        mjx-container { 
+            display: inline-block !important; 
+            vertical-align: middle !important; 
+            margin: 0 0.1em !important; 
+            line-height: 0 !important; 
+        }
+
+        .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 2rem; margin-top: 0.5rem; }
+        
+        /* Scrollbar Styling */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #ff8c00; border-radius: 10px; }
 
+        /* PDF & Print Calibration */
         @media print {
-            @page {
-                size: A4 portrait;
-                margin: 0;
-            }
+            @page { size: A4 portrait; margin: 10mm; }
+            #root > *:not(.print-modal-wrapper) { display: none !important; }
+            .no-print { display: none !important; }
             
-            #root > *:not(.print-modal-wrapper) {
-                display: none !important;
-            }
-
-            html, body {
-                height: auto !important;
-                overflow: visible !important;
-                background: white !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                width: 100% !important;
-            }
-
-            .print-modal-wrapper {
-                position: static !important;
-                display: block !important;
-                width: 100% !important;
-                height: auto !important;
-                padding: 0 !important;
-                margin: 0 !important;
-                background: white !important;
-                box-shadow: none !important;
-                overflow: visible !important;
-            }
-
-            .no-print {
-                display: none !important;
-            }
-
-            .print-scroll-container {
-                overflow: visible !important;
-                height: auto !important;
-                padding: 0 !important;
-                margin: 0 !important;
-                display: block !important;
-            }
-
             .print-container {
-                width: 210mm !important;
-                max-width: 210mm !important;
-                margin: 0 !important;
-                padding: 15mm !important;
-                border: none !important;
+                width: 100% !important;
+                max-width: 190mm !important; /* A4 210mm - 20mm margins */
+                margin: 0 auto !important;
+                padding: 0 !important;
                 box-shadow: none !important;
-                display: block !important;
-                position: relative !important;
-                left: 0 !important;
+                border: none !important;
+                overflow: visible !important;
+                background: white !important;
             }
 
             .pdf-block {
-                break-inside: avoid;
-                page-break-inside: avoid;
-                margin-bottom: 1.5rem;
-                padding: 0 !important;
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+                width: 100% !important;
             }
 
-            .print-container * {
-                color: black !important;
-                text-shadow: none !important;
-            }
+            table { width: 100% !important; table-layout: fixed !important; border-collapse: collapse !important; }
+            td, th { word-wrap: break-word !important; overflow-wrap: break-word !important; }
+        }
+
+        /* Screen Preview Container */
+        .print-container {
+            width: 210mm;
+            min-height: 297mm;
+            padding: 20mm;
+            margin: 0 auto;
+            background: white;
+            box-sizing: border-box;
+            position: relative;
         }
     </style>
 <script type="importmap">
