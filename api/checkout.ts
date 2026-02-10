@@ -27,7 +27,7 @@ export default async function handler(req: any, res: any) {
     const SECRET_KEY = process.env.DOKU_SECRET_KEY || dbSettings.secretKey;
 
     if (!CLIENT_ID || !SECRET_KEY) {
-      return res.status(500).json({ message: 'DOKU Credentials missing in both ENV and DB' });
+      return res.status(500).json({ message: 'Konfigurasi DOKU belum lengkap (Client ID / Secret Key Kosong)' });
     }
 
     const invoiceId = `INV-${Date.now()}-${user.id.substring(0, 4)}`;
@@ -64,6 +64,7 @@ export default async function handler(req: any, res: any) {
       .update(stringToSign)
       .digest('base64');
 
+    // Simpan dulu ke DB agar ada record intent (Pending)
     await db.execute({
       sql: "INSERT INTO transactions (id, userId, amount, credits, status, externalId, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
       args: [crypto.randomUUID(), user.id, packageInfo.amount, packageInfo.credits, 'PENDING', invoiceId, new Date().toISOString()]
@@ -90,9 +91,11 @@ export default async function handler(req: any, res: any) {
     if (data.response?.payment?.url) {
       return res.status(200).json(data);
     } else {
-      return res.status(400).json({ message: data.error?.message || "Gateway error" });
+      // Jika DOKU menolak, teruskan pesan errornya agar tahu penyebabnya (misal: Unauthorized / Signature Error)
+      const errorDetail = data.error?.message || data.message || "Gateway error";
+      return res.status(400).json({ message: `DOKU API Error: ${errorDetail}` });
     }
   } catch (error: any) {
-    return res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: `Internal API Error: ${error.message}` });
   }
 }
