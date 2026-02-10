@@ -19,7 +19,7 @@
                 processEscapes: true 
             },
             svg: { 
-                fontCache: 'global' 
+                fontCache: 'none' // 'none' lebih stabil untuk snapshot PDF/canvas dibanding 'global'
             },
             options: { 
                 enableMenu: false, 
@@ -34,88 +34,67 @@
             }
         };
 
-        let mathQueue = [];
-        let mathTimeout = null;
-        const processMathQueue = () => {
-            if (mathQueue.length === 0) return;
-            const targets = [...mathQueue];
-            mathQueue = [];
-            if (window.MathJax && window.MathJax.typesetPromise) {
-                window.MathJax.typesetPromise(targets).catch(err => console.error(err));
-            }
-        };
-
-        window.mathObserver = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    mathQueue.push(entry.target);
-                    window.mathObserver.unobserve(entry.target);
-                    if (mathTimeout) clearTimeout(mathTimeout);
-                    mathTimeout = setTimeout(processMathQueue, 100);
-                }
-            });
-        }, { threshold: 0.1, rootMargin: '0px 0px 200px 0px' });
-
+        // Engine untuk memantau perubahan DOM dan trigger MathJax
         window.observeMathItems = (containerId) => {
             const container = containerId ? document.getElementById(containerId) : document.body;
             if (!container) return;
-            container.querySelectorAll('.mjx-item').forEach(item => window.mathObserver.observe(item));
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise([container]).catch(err => console.error(err));
+            }
         };
     </script>
     <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
     
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #fffaf0; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #fffaf0; margin: 0; padding: 0; }
         .font-arabic { font-family: 'Amiri', serif; }
         .font-jp { font-family: 'Noto Sans JP', sans-serif; }
         .font-kr { font-family: 'Noto Serif KR', serif; }
         .font-zh { font-family: 'Noto Sans TC', sans-serif; }
         .orange-gradient { background: linear-gradient(135deg, #ff8c00 0%, #ff4500 100%); }
         
-        /* MathJax Styling Fixes */
+        /* MathJax Styling Fixes untuk PDF */
         mjx-container { 
             display: inline-block !important; 
             vertical-align: middle !important; 
-            margin: 0 0.15em !important; 
-            line-height: normal !important;
+            margin: 0 0.1em !important; 
+            line-height: 0 !important;
             max-width: 100% !important;
-        }
-        mjx-container[display="true"] {
-            display: block !important;
-            margin: 1em auto !important;
-            text-align: center;
         }
 
         .options-grid { 
             display: grid; 
             grid-template-columns: 1fr 1fr; 
-            gap: 0.75rem 2.5rem; 
-            margin-top: 0.75rem; 
+            gap: 0.5rem 2rem; 
+            margin-top: 0.5rem; 
             width: 100%;
         }
         
-        /* Scrollbar Styling */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #f1f1f1; }
-        ::-webkit-scrollbar-thumb { background: #ff8c00; border-radius: 10px; }
-
-        /* A4 Page Calibration */
+        /* A4 Container Setup - Margin 2.2cm = 22mm */
         .print-container {
             width: 210mm;
             min-height: 297mm;
-            padding: 15mm 20mm;
+            padding: 22mm !important; /* Margin 2.2 cm Atas-Bawah-Kiri-Kanan */
             margin: 0 auto;
             background: white;
-            box-sizing: border-box;
+            box-sizing: border-box !important;
             position: relative;
-            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+            color: black;
         }
 
-        /* PDF & Print Calibration */
+        /* Standarisasi Tabel agar tidak meluber */
+        .fixed-table {
+            width: 100% !important;
+            table-layout: fixed !important;
+            border-collapse: collapse !important;
+            box-sizing: border-box !important;
+        }
+
         @media print {
             @page { 
                 size: A4 portrait; 
-                margin: 0; 
+                margin: 0; /* Margin dikontrol oleh padding .print-container */
             }
             body { background: white !important; }
             #root > *:not(.print-modal-wrapper) { display: none !important; }
@@ -123,14 +102,13 @@
             
             .print-container {
                 width: 210mm !important;
-                height: auto !important;
                 margin: 0 !important;
-                padding: 15mm 20mm !important;
+                padding: 22mm !important;
                 box-shadow: none !important;
                 border: none !important;
-                overflow: visible !important;
-                background: white !important;
+                display: block !important;
                 box-sizing: border-box !important;
+                page-break-after: always;
             }
 
             .pdf-block {
@@ -139,24 +117,6 @@
                 width: 100% !important;
                 display: block !important;
             }
-
-            table { 
-                width: 100% !important; 
-                table-layout: fixed !important; 
-                border-collapse: collapse !important; 
-                word-wrap: break-word !important;
-            }
-            
-            td, th { 
-                word-wrap: break-word !important; 
-                overflow-wrap: break-word !important;
-                padding: 8px !important;
-            }
-        }
-
-        /* Custom scrollbar for preview */
-        .print-scroll-container {
-            scroll-behavior: smooth;
         }
     </style>
 <script type="importmap">
