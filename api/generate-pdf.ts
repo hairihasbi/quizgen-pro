@@ -27,6 +27,18 @@ export default async function handler(req: any, res: any) {
       return lvl;
     };
 
+    // Helper untuk grouping
+    const groupByType = (questions: any[]) => {
+      const groups: Record<string, any[]> = {};
+      questions.forEach(q => {
+        if (!groups[q.type]) groups[q.type] = [];
+        groups[q.type].push(q);
+      });
+      return groups;
+    };
+
+    const grouped = groupByType(quiz.questions);
+
     const htmlContent = `
     <!DOCTYPE html>
     <html lang="id">
@@ -62,21 +74,31 @@ export default async function handler(req: any, res: any) {
         }
 
         .header { text-align: center; margin-bottom: 5px; }
-        .header h1 { margin: 0; font-size: 15pt; font-weight: 800; font-family: 'Plus Jakarta Sans', sans-serif; }
-        .header h2 { margin: 3px 0; font-size: 12pt; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; }
-        .header-line { border-top: 3px solid black; border-bottom: 1px solid black; height: 4px; margin: 10px 0 20px 0; }
+        .header h1 { margin: 0; font-size: 14pt; font-weight: 800; font-family: 'Plus Jakarta Sans', sans-serif; text-transform: uppercase; }
+        .header h2 { margin: 2px 0; font-size: 11pt; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; text-transform: uppercase; }
+        .header-line { border-top: 3px solid black; border-bottom: 1px solid black; height: 4px; margin: 10px 0 15px 0; }
 
-        .info-table { width: 100%; border-collapse: collapse; font-size: 10pt; margin-bottom: 15px; font-weight: 700; }
-        .info-table td { padding: 3px 0; }
-        .section-title { font-size: 11pt; font-weight: 800; text-decoration: underline; text-transform: uppercase; margin-bottom: 20px; text-align: center; font-family: 'Plus Jakarta Sans', sans-serif; }
+        .student-id { width: 100%; border-collapse: collapse; font-size: 10pt; margin-bottom: 25px; }
+        .student-id td { padding: 4px 0; font-weight: 700; }
+        .dot-line { border-bottom: 1px dotted #ccc; color: #999; font-weight: 400; font-style: italic; }
 
-        /* Styles for Questions */
+        .type-header { 
+          background: #f3f4f6; 
+          padding: 6px 15px; 
+          border-top: 2px solid black; 
+          border-bottom: 2px solid black; 
+          font-family: 'Plus Jakarta Sans', sans-serif;
+          font-weight: 800;
+          font-size: 11pt;
+          text-transform: uppercase;
+          margin: 25px 0 15px 0;
+        }
+
         .question-item { margin-bottom: 20px; page-break-inside: avoid; display: flex; gap: 10px; font-size: 10.5pt; }
         .q-num { font-weight: 700; min-width: 25px; text-align: right; }
         .q-body { flex: 1; text-align: justify; }
         .passage { background: #f9f9f9; border: 1.5px solid #000; padding: 12px; margin: 10px 0; font-style: italic; font-size: 10pt; page-break-inside: avoid; }
 
-        /* HORIZONTAL OPTIONS LAYOUT */
         .options-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -84,19 +106,12 @@ export default async function handler(req: any, res: any) {
           row-gap: 3px;
           margin-top: 8px;
         }
-        .option-item {
-          display: flex;
-          gap: 8px;
-          align-items: flex-start;
-        }
+        .option-item { display: flex; gap: 8px; align-items: flex-start; }
         .opt-label { font-weight: 700; min-width: 15px; }
 
-        /* Styles for Matrix Table */
         .kisi-table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
         .kisi-table th, .kisi-table td { border: 1px solid black; padding: 6px; vertical-align: top; }
         .kisi-table th { background: #eeeeee; font-weight: 800; text-align: center; }
-        .text-center { text-align: center; }
-        .font-bold { font-weight: 800; }
 
         mjx-container { display: inline-block !important; vertical-align: middle; margin: 0 2px !important; }
       </style>
@@ -104,25 +119,24 @@ export default async function handler(req: any, res: any) {
     <body>
       <div class="page">
         <div class="header">
-          <h1>BANK SOAL KURIKULUM MERDEKA</h1>
+          <h1>NASKAH SOAL EVALUASI HASIL BELAJAR</h1>
           <h2>${quiz.subject.toUpperCase()} - ${quiz.grade.toUpperCase()}</h2>
         </div>
         <div class="header-line"></div>
 
-        <table class="info-table">
+        <table class="student-id">
           <tr>
-            <td width="15%">Mata Pelajaran</td><td width="2%">:</td><td width="43%">${quiz.subject}</td>
-            <td width="15%" align="right">Waktu</td><td width="2%">:</td><td width="23%">90 Menit</td>
+            <td width="15%">Nama Siswa</td><td width="2%">:</td><td class="dot-line">.........................................................</td>
+            <td width="15%" align="right">Hari / Tanggal</td><td width="2%">:</td><td width="20%" class="dot-line">......................</td>
           </tr>
           <tr>
-            <td>Jenjang / Kelas</td><td>:</td><td>${quiz.level} / ${quiz.grade}</td>
-            <td align="right">Jumlah Soal</td><td>:</td><td>${quiz.questions.length} Butir</td>
+            <td>Kelas / No. Absen</td><td>:</td><td class="dot-line">.........................................................</td>
+            <td align="right">Waktu</td><td>:</td><td class="dot-line">90 Menit</td>
           </tr>
         </table>
 
-        <div class="section-title">${isKisiKisi ? 'MATRIKS KISI-KISI SOAL' : 'DAFTAR BUTIR SOAL'}</div>
-
         ${isKisiKisi ? `
+          <div style="text-align:center; text-decoration:underline; font-weight:800; font-family:'Plus Jakarta Sans'; margin-bottom:20px;">MATRIKS KISI-KISI SOAL</div>
           <table class="kisi-table">
             <thead>
               <tr>
@@ -139,47 +153,51 @@ export default async function handler(req: any, res: any) {
             <tbody>
               ${quiz.questions.map((q: any, i: number) => `
                 <tr>
-                  <td class="text-center">${i + 1}</td>
-                  <td>${q.competency || `Menguasai konsep pada topik ${q.topic || quiz.topic}`}</td>
-                  <td class="font-bold">${q.topic || quiz.topic}</td>
+                  <td style="text-align:center;">${i + 1}</td>
+                  <td>${q.competency || `Menguasai topik ${q.topic}`}</td>
+                  <td style="font-weight:700;">${q.topic}</td>
                   <td>${q.indicator}</td>
-                  <td class="text-center font-bold">${mapLevel(q.cognitiveLevel)}</td>
-                  <td class="text-center">${q.type}</td>
-                  <td class="text-center font-bold">${i + 1}</td>
-                  <td class="text-center font-bold">${Array.isArray(q.answer) ? q.answer.join(',') : q.answer}</td>
+                  <td style="text-align:center; font-weight:700;">${mapLevel(q.cognitiveLevel)}</td>
+                  <td style="text-align:center;">${q.type}</td>
+                  <td style="text-align:center; font-weight:700;">${i + 1}</td>
+                  <td style="text-align:center; font-weight:700;">${Array.isArray(q.answer) ? q.answer.join(',') : q.answer}</td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
         ` : `
-          <div class="questions">
-            ${quiz.questions.map((q: any, i: number) => {
-              const isNewPassage = q.passage && (i === 0 || quiz.questions[i-1].passage !== q.passage);
-              return `
-                ${isNewPassage ? `<div class="passage"><strong>WACANA STIMULUS:</strong><br/>${q.passage}</div>` : ''}
-                <div class="question-item">
-                  <div class="q-num">${i + 1}.</div>
-                  <div class="q-body">
-                    <div>${q.text}</div>
-                    ${q.options && q.options.length > 0 ? `
-                      <div class="options-grid">
-                        ${q.options.map((opt: any) => `
-                          <div class="option-item">
-                            <span class="opt-label">${opt.label}.</span>
-                            <span>${opt.text}</span>
-                          </div>
-                        `).join('')}
-                      </div>
-                    ` : ''}
-                    ${showAnswer ? `<div style="margin-top:10px; padding:8px; background:#f0fdf4; border:1px dashed #166534; font-size:9pt;">
-                      <strong>KUNCI: ${Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</strong><br/>
-                      <em>Pembahasan: ${q.explanation}</em>
-                    </div>` : ''}
+          ${Object.entries(grouped).map(([type, questions], gIdx) => `
+            <div class="type-header">${String.fromCharCode(65 + gIdx)}. ${type}</div>
+            <div class="questions">
+              ${questions.map((q: any) => {
+                const absIdx = quiz.questions.findIndex((allQ: any) => allQ.id === q.id) + 1;
+                const isNewPassage = q.passage && (questions.indexOf(q) === 0 || questions[questions.indexOf(q)-1].passage !== q.passage);
+                return `
+                  ${isNewPassage ? `<div class="passage"><strong>WACANA STIMULUS:</strong><br/>${q.passage}</div>` : ''}
+                  <div class="question-item">
+                    <div class="q-num">${absIdx}.</div>
+                    <div class="q-body">
+                      <div>${q.text}</div>
+                      ${q.options && q.options.length > 0 ? `
+                        <div class="options-grid">
+                          ${q.options.map((opt: any) => `
+                            <div class="option-item">
+                              <span class="opt-label">${opt.label}.</span>
+                              <span>${opt.text}</span>
+                            </div>
+                          `).join('')}
+                        </div>
+                      ` : ''}
+                      ${showAnswer ? `<div style="margin-top:10px; padding:8px; background:#f0fdf4; border:1px dashed #166534; font-size:9pt;">
+                        <strong>KUNCI: ${Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</strong><br/>
+                        <em>Pembahasan: ${q.explanation}</em>
+                      </div>` : ''}
+                    </div>
                   </div>
-                </div>
-              `;
-            }).join('')}
-          </div>
+                `;
+              }).join('')}
+            </div>
+          `).join('')}
         `}
       </div>
     </body>
@@ -187,7 +205,6 @@ export default async function handler(req: any, res: any) {
     `;
 
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-    
     await page.evaluate(async () => {
       if ((window as any).mathjaxReady) await (window as any).mathjaxReady;
     });
