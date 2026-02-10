@@ -40,7 +40,12 @@
             const container = containerId ? document.getElementById(containerId) : document.body;
             if (!container) return;
             if (window.MathJax && window.MathJax.typesetPromise) {
-                window.MathJax.typesetPromise([container]).catch(err => console.error(err));
+                // Gunakan promise untuk memastikan rendering selesai sebelum konfirmasi
+                window.MathJax.typesetPromise([container])
+                    .then(() => {
+                        console.log("[MathJax] Typeset complete for", containerId);
+                    })
+                    .catch(err => console.error("[MathJax] Error:", err));
             }
         };
     </script>
@@ -64,7 +69,6 @@
         }
 
         /* Container Cetak / Preview A4 */
-        /* Width A4 = 210mm. Margin 2.2cm = 22mm */
         .print-container {
             width: 210mm !important;
             min-height: 297mm;
@@ -75,14 +79,7 @@
             position: relative;
             color: black;
             box-shadow: 0 0 50px rgba(0,0,0,0.1);
-            overflow: visible !important; /* Penting agar snapshot tidak terpotong */
-        }
-
-        /* Mode Ekspor: Menghilangkan shadow dan margin untuk presisi capture */
-        .exporting .print-container {
-            box-shadow: none !important;
-            margin: 0 !important;
-            width: 210mm !important;
+            overflow: visible !important;
         }
 
         .fixed-table {
@@ -93,8 +90,16 @@
         }
 
         @media print {
-            @page { size: A4 portrait; margin: 0; }
-            body { background: white !important; overflow: visible !important; }
+            @page { 
+                size: A4 portrait; 
+                margin: 0; 
+            }
+            body { 
+                background: white !important; 
+                overflow: visible !important; 
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
             #root > *:not(.print-modal-wrapper) { display: none !important; }
             .no-print { display: none !important; }
             
@@ -105,6 +110,7 @@
                 border: none !important;
                 box-shadow: none !important;
                 display: block !important;
+                page-break-after: always;
             }
 
             .pdf-block {
@@ -112,7 +118,18 @@
                 page-break-inside: avoid !important;
                 width: 100% !important;
                 display: block !important;
-                margin-bottom: 1rem;
+                margin-bottom: 1.5rem;
+            }
+
+            table {
+                page-break-inside: auto;
+            }
+            tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+            thead {
+                display: table-header-group;
             }
         }
 
@@ -131,7 +148,9 @@
     "crypto": "https://esm.sh/crypto@^1.0.1",
     "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
     "vite": "https://esm.sh/vite@^7.3.1",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4"
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4",
+    "puppeteer-core": "https://esm.sh/puppeteer-core@^24.37.2",
+    "@sparticuz/chromium": "https://esm.sh/@sparticuz/chromium@^143.0.4"
   }
 }
 </script>
