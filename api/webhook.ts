@@ -3,78 +3,76 @@ import { createClient } from '@libsql/client';
 import crypto from 'crypto';
 
 /**
- * Webhook Handler DOKU - Robust Validation
+ * Webhook Handler DOKU - Signature Validation Fix
  */
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
-  // Ambil Key dari ENV
   const CLIENT_ID = (process.env.DOKU_CLIENT_ID || "").trim();
   const SECRET_KEY = (process.env.DOKU_SECRET_KEY || "").trim();
   const TURSO_URL = process.env.TURSO_DB_URL;
   const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
 
-  // Header dari DOKU (Dukungan case-insensitive)
+  // Ambil headers (case-insensitive)
   const incomingSignature = req.headers['signature'] || req.headers['Signature'];
   const requestId = req.headers['request-id'] || req.headers['Request-Id'];
   const timestamp = req.headers['request-timestamp'] || req.headers['Request-Timestamp'];
+  const incomingDigest = req.headers['digest'] || req.headers['Digest'];
   const targetPath = '/api/webhook'; 
 
   if (!incomingSignature || !SECRET_KEY || !CLIENT_ID || !TURSO_URL) {
-    console.error("[WEBHOOK] Unauthorized access attempt - missing headers/config");
+    console.error("[WEBHOOK] Unauthorized: Missing mandatory headers or keys");
     return res.status(401).send('Unauthorized');
   }
 
   try {
-    // 1. Dapatkan Raw Body String untuk Digest
-    const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
-    const digest = crypto.createHash('sha256').update(rawBody).digest('base64');
+    // 1. Bersihkan Digest (Hapus prefix SHA-256= jika ada)
+    const digestOnly = incomingDigest ? incomingDigest.replace('SHA-256=', '') : '';
     
-    // 2. Rekonstruksi String-To-Sign (Format Identik dengan pengirim)
+    // 2. Rekonstruksi String-To-Sign
     const stringToSign = 
       `Client-Id:${CLIENT_ID}\n` +
       `Request-Id:${requestId}\n` +
       `Request-Timestamp:${timestamp}\n` +
       `Request-Target:${targetPath}\n` +
-      `Digest:${digest}`;
+      `Digest:${digestOnly}`;
 
-    // 3. Hitung Signature Lokal
+    // 3. Kalkulasi Signature Lokal
     const calculatedSignature = crypto
       .createHmac('sha256', SECRET_KEY)
       .update(stringToSign)
       .digest('base64');
 
-    // 4. Verifikasi dengan Signature Header
+    // 4. Verifikasi
     if (`HMACSHA256=${calculatedSignature}` !== incomingSignature) {
-      console.error("[WEBHOOK] Signature Mismatch!", {
+      console.error("[WEBHOOK_SIG_MISMATCH]", {
         received: incomingSignature,
         expected: `HMACSHA256=${calculatedSignature}`
       });
       return res.status(401).send('Invalid Signature');
     }
 
-    // Parsing Body (DOKU mengirimkan status sukses di sini)
+    // Parsing data pembayaran
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     const invoiceId = body.order?.invoice_number;
     const paymentStatus = body.transaction?.status;
 
     const db = createClient({ url: TURSO_URL, authToken: TURSO_TOKEN });
     
-    // Cek Transaksi di Database
     const trxCheck = await db.execute({
       sql: "SELECT * FROM transactions WHERE externalId = ? AND status = 'PENDING'",
       args: [invoiceId]
     });
 
     if (trxCheck.rows.length === 0) {
-      return res.status(200).send('Transaction already processed or not found');
+      return res.status(200).send('OK (Already Processed)');
     }
 
     const localTrx = trxCheck.rows[0];
     const isSuccess = paymentStatus === 'SUCCESS' || paymentStatus === 'DONE';
     const finalStatus = isSuccess ? 'SUCCESS' : 'FAILED';
 
-    // Update Status dan Tambah Kredit User secara Atomik
+    // Update status & tambah kredit
     await db.batch([
       { sql: "UPDATE transactions SET status = ? WHERE externalId = ?", args: [finalStatus, invoiceId] },
       ...(isSuccess ? [{ 
@@ -83,7 +81,7 @@ export default async function handler(req: any, res: any) {
       }] : [])
     ], "write");
 
-    console.log(`[WEBHOOK] Success processing ${invoiceId} for user ${localTrx.userId}`);
+    console.log(`[WEBHOOK_SUCCESS] ${invoiceId} processed.`);
     return res.status(200).send('OK');
 
   } catch (error: any) {

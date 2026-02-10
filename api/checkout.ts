@@ -3,8 +3,8 @@ import { createClient } from '@libsql/client';
 import crypto from 'crypto';
 
 /**
- * DOKU Checkout API Handler - Ultra Strict Signature Fix
- * Mengatasi 'Invalid Header Signature' dengan standarisasi serialisasi body.
+ * DOKU Checkout API Handler - Production Locked
+ * Menangani pembuatan invoice menggunakan Production Gateway DOKU secara permanen.
  */
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ message: 'Method Not Allowed' });
@@ -26,17 +26,17 @@ export default async function handler(req: any, res: any) {
     const SECRET_KEY = (process.env.DOKU_SECRET_KEY || dbSettings.secretKey || "").trim();
 
     if (!CLIENT_ID || !SECRET_KEY) {
-      return res.status(500).json({ message: 'Konfigurasi DOKU (Client ID/Secret Key) tidak ditemukan.' });
+      return res.status(500).json({ message: 'Konfigurasi DOKU Production (Client ID / Secret Key) tidak ditemukan.' });
     }
 
-    // 2. Identitas Transaksi
+    // 2. Persiapan Identitas & Timestamp
     const invoiceId = `INV${Date.now()}`;
     const requestId = crypto.randomUUID();
-    // Format: YYYY-MM-DDTHH:mm:ssZ (DOKU V1 Standar)
+    // Format DOKU: YYYY-MM-DDTHH:mm:ssZ
     const timestamp = new Date().toISOString().split('.')[0] + 'Z';
     const targetPath = '/checkout/v1/payment';
 
-    // 3. Persiapkan Payload Utama
+    // 3. Payload Body
     const payload = {
       order: {
         amount: Math.floor(Number(packageInfo.amount)),
@@ -51,25 +51,23 @@ export default async function handler(req: any, res: any) {
         }]
       },
       customer: {
-        name: String(user.fullName || user.username || 'User').replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 32),
+        name: String(user.fullName || user.username || 'Teacher').replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 32),
         email: String(user.email || `${user.username}@quizgen.pro`).trim()
       }
     };
 
-    // PENTING: Serialisasi payload satu kali saja untuk menjamin konsistensi Hash
     const bodyString = JSON.stringify(payload);
 
-    // 4. Kalkulasi Digest (Base64 dari SHA256 Body)
-    const digest = crypto.createHash('sha256').update(bodyString).digest('base64');
+    // 4. Kalkulasi Digest (Base64 dari SHA256 body)
+    const digestHash = crypto.createHash('sha256').update(bodyString).digest('base64');
 
     // 5. Konstruksi String-To-Sign (STRICT FORMAT)
-    // Pastikan TIDAK ADA spasi setelah titik dua (:) dan gunakan newline (\n)
     const stringToSign = 
       `Client-Id:${CLIENT_ID}\n` +
       `Request-Id:${requestId}\n` +
       `Request-Timestamp:${timestamp}\n` +
       `Request-Target:${targetPath}\n` +
-      `Digest:${digest}`;
+      `Digest:${digestHash}`;
 
     // 6. Generate Signature HMAC-SHA256
     const signature = crypto
@@ -77,16 +75,16 @@ export default async function handler(req: any, res: any) {
       .update(stringToSign)
       .digest('base64');
 
-    // Simpan ke DB lokal/cloud sebagai history PENDING
+    // Simpan ke DB sebagai PENDING
     await db.execute({
       sql: "INSERT INTO transactions (id, userId, amount, credits, status, externalId, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
       args: [crypto.randomUUID(), user.id, payload.order.amount, packageInfo.credits, 'PENDING', invoiceId, new Date().toISOString()]
     });
 
-    const isProd = dbSettings.mode === 'production' || process.env.NODE_ENV === 'production';
-    const dokuBaseUrl = isProd ? 'https://api.doku.com' : 'https://api-sandbox.doku.com';
+    // SELALU GUNAKAN API PRODUCTION
+    const dokuBaseUrl = 'https://api.doku.com';
 
-    // 7. Eksekusi Request ke DOKU
+    // 7. Kirim Request ke DOKU
     const response = await fetch(`${dokuBaseUrl}${targetPath}`, {
       method: 'POST',
       headers: {
@@ -94,7 +92,7 @@ export default async function handler(req: any, res: any) {
         'Request-Id': requestId,
         'Request-Timestamp': timestamp,
         'Signature': `HMACSHA256=${signature}`,
-        'Digest': digest,
+        'Digest': `SHA-256=${digestHash}`,
         'Content-Type': 'application/json'
       },
       body: bodyString
@@ -105,21 +103,18 @@ export default async function handler(req: any, res: any) {
     if (response.ok && data.response?.payment?.url) {
       return res.status(200).json(data);
     } else {
-      console.error("[DOKU_REJECTED]", {
+      console.error("[DOKU_PRODUCTION_REJECTED]", {
         status: response.status,
         requestId,
-        timestamp,
-        errorData: data,
-        // Log ini hanya muncul di Vercel Dashboard untuk debugging internal
-        internalHint: "Pastikan Secret Key di Dashboard DOKU sama dengan di .env"
+        error: data
       });
       return res.status(response.status).json({
-        message: data.error?.message || "DOKU menolak Signature. Periksa kesesuaian Client ID/Secret Key.",
+        message: data.error?.message || "DOKU API Error: Periksa Kredensial Production Anda",
         details: data
       });
     }
   } catch (error: any) {
     console.error("[FATAL_CHECKOUT_ERROR]", error);
-    return res.status(500).json({ message: `Internal Server Error: ${error.message}` });
+    return res.status(500).json({ message: `Internal Error: ${error.message}` });
   }
 }
