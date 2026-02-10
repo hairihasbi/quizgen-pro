@@ -30,12 +30,14 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           quiz, 
-          exportMode, 
           showAnswer: exportMode === 'lengkap' || showAnswer 
         })
       });
 
-      if (!response.ok) throw new Error("Gagal generate PDF di server.");
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.message || "Gagal generate PDF di server.");
+      }
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -50,11 +52,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
     } finally {
       setIsDownloading(false);
     }
-  };
-
-  const sanitizeHTML = (html: string) => {
-    if (!html || html === 'null') return "";
-    return html.replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gmi, "");
   };
 
   return (
@@ -76,8 +73,22 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
              <button onClick={() => { setExportMode('lengkap'); setShowAnswer(true); }} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all ${exportMode === 'lengkap' ? 'bg-white text-orange-600 shadow-md' : 'text-orange-300 hover:text-orange-400'}`}>KUNCI JAWABAN</button>
           </div>
           
-          <button onClick={handleDownloadPdfSSR} disabled={isDownloading} className="px-8 py-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black shadow-xl uppercase transition-all hover:scale-105 active:scale-95 flex items-center gap-3">
-            {isDownloading ? <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div> : '📥'} SSR PDF
+          <button 
+            onClick={handleDownloadPdfSSR} 
+            disabled={isDownloading} 
+            className="px-8 py-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black shadow-xl uppercase transition-all hover:scale-105 active:scale-95 flex items-center gap-3"
+          >
+            {isDownloading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                <span>Generating...</span>
+              </>
+            ) : (
+              <>
+                <span>📥</span>
+                <span>Download PDF (SSR)</span>
+              </>
+            )}
           </button>
 
           <button onClick={() => window.print()} className="px-8 py-4 orange-gradient text-white rounded-2xl text-[10px] font-black shadow-xl uppercase transition-all hover:scale-105 active:scale-95">🖨️ Cetak</button>
@@ -93,8 +104,9 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                 {quiz.subject} | {quiz.level} {quiz.grade}
              </div>
           </div>
-          {/* Konten preview tetap sama untuk kenyamanan user melihat kuis sebelum unduh */}
-          <div className="w-full text-center text-[10px] text-gray-400 mb-4 no-print italic">Preview hanya estimasi tampilan. Gunakan tombol SSR PDF untuk hasil cetak presisi.</div>
+          <div className="w-full text-center text-[11px] text-orange-500 font-bold mb-4 no-print bg-orange-50 py-2 rounded-xl">
+            ✨ Menggunakan Mesin SSR Puppeteer untuk hasil cetak yang identik dengan Bank Soal SMA.
+          </div>
         </div>
       </div>
     </div>
