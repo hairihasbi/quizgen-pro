@@ -34,8 +34,9 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ user, onClose, onSuccess }) => 
         name: pkg.name
       });
       onSuccess(url);
-    } catch (err) {
-      alert("Terjadi kesalahan sistem pembayaran.");
+    } catch (err: any) {
+      // PERBAIKAN: Tampilkan pesan error asli untuk memudahkan diagnosa (misal: "Client ID Not Found")
+      alert(`Gagal memproses pembayaran: ${err.message || 'Terjadi kesalahan sistem.'}`);
     } finally {
       setLoading(null);
     }
