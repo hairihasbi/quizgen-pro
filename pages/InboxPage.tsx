@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { EmailService } from '../services/emailService';
 import { StorageService } from '../services/storageService';
 import { EmailNotification } from '../types';
+import { Trash2, CheckSquare, Square, X } from 'lucide-react';
 
 interface InboxPageProps {
   user: any;
@@ -16,6 +17,9 @@ const InboxPage: React.FC<InboxPageProps> = ({ user }) => {
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
+  
   const limit = 10;
 
   const fetchEmails = async (pageToFetch: number, isInitial: boolean = false) => {
@@ -40,6 +44,7 @@ const InboxPage: React.FC<InboxPageProps> = ({ user }) => {
   }, [user.id]);
 
   const handleRead = async (mail: EmailNotification) => {
+    // Jangan buka modal jika sedang klik checkbox
     setSelectedMail(mail);
     if (!mail.isRead) {
       await EmailService.markAsRead(mail.id);
@@ -60,13 +65,47 @@ const InboxPage: React.FC<InboxPageProps> = ({ user }) => {
     for (const mail of unread) {
       await EmailService.markAsRead(mail.id);
     }
-    // Refresh current page list
     fetchEmails(1, true);
     setPage(1);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelect = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) newSelected.delete(id);
+    else newSelected.add(id);
+    setSelectedIds(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredEmails.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredEmails.map(e => e.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Hapus ${selectedIds.size} pesan terpilih secara permanen?`)) return;
+
+    setIsDeleting(true);
+    const idsToDelete = Array.from(selectedIds);
+    
+    try {
+      await EmailService.deleteNotifications(idsToDelete);
+      setEmails(prev => prev.filter(e => !selectedIds.has(e.id)));
+      setSelectedIds(new Set());
+    } catch (e) {
+      alert("Gagal menghapus pesan.");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const filteredEmails = emails.filter(e => filter === 'all' || !e.isRead);
-  const unreadCount = emails.filter(e => !e.isRead).length;
+  const allSelected = filteredEmails.length > 0 && selectedIds.size === filteredEmails.length;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
@@ -96,7 +135,49 @@ const InboxPage: React.FC<InboxPageProps> = ({ user }) => {
         </div>
       </div>
 
+      {/* Floating Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="sticky top-4 z-50 animate-in slide-in-from-top-10 duration-500 bg-gray-900 text-white p-4 rounded-3xl shadow-2xl border border-white/10 flex items-center justify-between mx-auto max-w-2xl px-8">
+           <div className="flex items-center gap-4">
+              <span className="w-10 h-10 orange-gradient rounded-xl flex items-center justify-center text-white font-black">{selectedIds.size}</span>
+              <span className="text-xs font-black uppercase tracking-widest">Pesan Terpilih</span>
+           </div>
+           <div className="flex items-center gap-4">
+              <button 
+                onClick={() => setSelectedIds(new Set())}
+                className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white transition-colors"
+              >Batal</button>
+              <button 
+                onClick={handleBulkDelete}
+                disabled={isDeleting}
+                className="px-6 py-3 bg-rose-500 hover:bg-rose-600 text-white font-black rounded-xl text-[10px] uppercase tracking-widest shadow-lg flex items-center gap-2 transition-all disabled:opacity-50"
+              >
+                {isDeleting ? 'Menghapus...' : (
+                  <>
+                    <Trash2 size={14} />
+                    Hapus Massal
+                  </>
+                )}
+              </button>
+           </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-[3rem] border shadow-sm overflow-hidden min-h-[500px] flex flex-col">
+        {/* Header List with Select All */}
+        <div className="bg-gray-50/50 border-b p-6 flex items-center gap-8">
+           <button 
+             onClick={toggleSelectAll} 
+             className="flex items-center gap-3 group outline-none"
+             aria-label="Pilih Semua"
+           >
+              <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${allSelected ? 'bg-orange-500 border-orange-500' : 'bg-white border-gray-300 group-hover:border-orange-500'}`}>
+                {allSelected && <CheckSquare size={14} className="text-white" />}
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Pilih Semua</span>
+           </button>
+        </div>
+
         {loading ? (
           <div className="p-20 text-center animate-pulse text-gray-300 font-black uppercase text-xs tracking-[0.2em]">Mengunduh Pesan...</div>
         ) : filteredEmails.length > 0 ? (
@@ -105,10 +186,17 @@ const InboxPage: React.FC<InboxPageProps> = ({ user }) => {
               <div 
                 key={mail.id}
                 onClick={() => handleRead(mail)}
-                className={`p-8 flex items-center gap-8 hover:bg-orange-50/10 cursor-pointer transition-all group ${!mail.isRead ? 'bg-orange-50/30' : ''}`}
+                className={`p-8 flex items-center gap-8 hover:bg-orange-50/10 cursor-pointer transition-all group ${!mail.isRead ? 'bg-orange-50/30' : ''} ${selectedIds.has(mail.id) ? 'bg-orange-50/50' : ''}`}
               >
+                <div 
+                  onClick={(e) => toggleSelect(e, mail.id)}
+                  className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all shrink-0 ${selectedIds.has(mail.id) ? 'bg-orange-500 border-orange-500 shadow-md' : 'bg-white border-gray-200 group-hover:border-orange-500'}`}
+                >
+                  {selectedIds.has(mail.id) && <CheckSquare size={14} className="text-white" />}
+                </div>
+
                 <div className={`w-3 h-3 rounded-full shrink-0 ${!mail.isRead ? 'bg-orange-500 animate-pulse' : 'bg-gray-200'}`}></div>
-                <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform">
+                <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform shadow-inner">
                   {mail.type === 'success' ? '✅' : mail.type === 'error' ? '❌' : 'ℹ️'}
                 </div>
                 <div className="flex-1 min-w-0">
