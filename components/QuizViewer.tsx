@@ -13,12 +13,12 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
   const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
-    // Memberikan waktu ekstra bagi DOM untuk render soal sebelum memanggil MathJax
+    // Memastikan MathJax memproses konten baru setiap kali mode atau data berubah
     const timer = setTimeout(() => {
       if ((window as any).observeMathItems) {
         (window as any).observeMathItems('quiz-print-area');
       }
-    }, 500); // Penambahan delay rendering ke 500ms
+    }, 800); // Penambahan delay rendering untuk kestabilan MathJax
     return () => clearTimeout(timer);
   }, [quiz, showAnswer, exportMode]);
 
@@ -97,63 +97,77 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
       </header>
 
       <div className="flex-1 overflow-y-auto p-0 md:p-12 flex justify-center custom-scrollbar print-scroll-container">
-        <div id="quiz-print-area" className="print-container bg-white text-gray-900">
+        <div id="quiz-print-area" className="print-container bg-white text-gray-900 shadow-none border-none">
           
-          {/* Header Bank Soal SMA - Identik dengan Screenshot */}
-          <div className="text-center mb-2">
-            <h1 className="text-xl font-black uppercase tracking-tight m-0" style={{fontFamily: 'Plus Jakarta Sans'}}>BANK SOAL SMA</h1>
+          {/* Header Identitas Sekolah / Bank Soal */}
+          <div className="text-center mb-1">
+            <h1 className="text-xl font-black uppercase tracking-tighter m-0" style={{fontFamily: 'Plus Jakarta Sans'}}>BANK SOAL KURIKULUM MERDEKA</h1>
             <h2 className="text-lg font-bold uppercase m-0" style={{fontFamily: 'Plus Jakarta Sans'}}>{quiz.subject} - {quiz.grade}</h2>
+            <div className="text-[9pt] font-medium tracking-widest text-gray-500">TAHUN PELAJARAN 2024/2025</div>
           </div>
           
-          <div className="border-t-[3px] border-b border-black h-[5px] mb-4"></div>
+          <div className="border-t-[3px] border-b border-black h-[5px] mb-6"></div>
 
-          {/* Tabel Identitas */}
-          <table className="w-full mb-6 text-[10pt] font-bold border-collapse">
+          {/* Tabel Informasi Identitas */}
+          <table className="w-full mb-8 text-[10.5pt] font-bold border-collapse">
             <tbody>
               <tr>
-                <td className="w-20">Topik</td>
-                <td className="w-4 text-center">:</td>
-                <td>{quiz.topic}</td>
-                <td className="w-20 text-right">Waktu</td>
-                <td className="w-4 text-center">:</td>
-                <td className="w-24">90 Menit</td>
+                <td className="w-32 py-1">Mata Pelajaran</td>
+                <td className="w-4 py-1 text-center">:</td>
+                <td className="py-1">{quiz.subject}</td>
+                <td className="w-32 py-1 text-right">Waktu</td>
+                <td className="w-4 py-1 text-center">:</td>
+                <td className="w-32 py-1">90 Menit</td>
               </tr>
               <tr>
-                <td>Kode</td>
-                <td className="text-center">:</td>
-                <td>261419</td>
-                <td className="text-right">Jumlah</td>
-                <td className="text-center">:</td>
-                <td>{quiz.questions.length} Soal</td>
+                <td className="py-1">Jenjang / Kelas</td>
+                <td className="py-1 text-center">:</td>
+                <td className="py-1">{quiz.level} / {quiz.grade}</td>
+                <td className="py-1 text-right">Target</td>
+                <td className="py-1 text-center">:</td>
+                <td className="py-1">{quiz.questions.length} Butir Soal</td>
+              </tr>
+              <tr>
+                <td className="py-1">Topik Utama</td>
+                <td className="py-1 text-center">:</td>
+                <td className="py-1" colSpan={4}>{quiz.topic}</td>
               </tr>
             </tbody>
           </table>
 
-          <div className="text-[11pt] font-black underline uppercase mb-4" style={{fontFamily: 'Plus Jakarta Sans'}}>
-            {exportMode === 'kisi-kisi' ? 'KISI-KISI PENYUSUNAN SOAL' : 'URAIAN SOAL'}
+          <div className="text-[11pt] font-black underline uppercase mb-6 text-center" style={{fontFamily: 'Plus Jakarta Sans'}}>
+            {exportMode === 'kisi-kisi' ? 'KISI-KISI PENULISAN SOAL EVALUASI' : 'URAIAN BUTIR SOAL'}
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-8">
             {exportMode === 'kisi-kisi' ? (
-              <table className="w-full border-collapse border-2 border-black text-[9pt]">
+              <table className="w-full border-collapse border-2 border-black text-[8.5pt]">
                 <thead>
                   <tr className="bg-gray-100">
-                    <th className="border border-black p-2">NO</th>
-                    <th className="border border-black p-2">KOMPETENSI / INDIKATOR</th>
-                    <th className="border border-black p-2">LEVEL</th>
-                    <th className="border border-black p-2">KUNCI</th>
+                    <th className="border-2 border-black p-2 w-8 text-center">NO</th>
+                    <th className="border-2 border-black p-2 w-48 text-left">MATERI / LINGKUP MATERI</th>
+                    <th className="border-2 border-black p-2 text-left">INDIKATOR PENCAPAIAN SOAL</th>
+                    <th className="border-2 border-black p-2 w-20 text-center">LEVEL</th>
+                    <th className="border-2 border-black p-2 w-28 text-center">BENTUK SOAL</th>
+                    <th className="border-2 border-black p-2 w-12 text-center">NO SOAL</th>
+                    <th className="border-2 border-black p-2 w-16 text-center">KUNCI</th>
                   </tr>
                 </thead>
                 <tbody>
                   {quiz.questions.map((q, i) => (
                     <tr key={q.id}>
-                      <td className="border border-black p-2 text-center">{i + 1}</td>
-                      <td className="border border-black p-2">
-                        <div className="font-bold">{q.indicator}</div>
-                        <div className="italic text-gray-600">{q.competency}</div>
+                      <td className="border-2 border-black p-2 text-center font-bold">{i + 1}</td>
+                      <td className="border-2 border-black p-2 align-top">
+                        <div className="font-bold uppercase mb-1">{quiz.subject}</div>
+                        <div className="text-gray-700">{q.topic || quiz.topic}</div>
                       </td>
-                      <td className="border border-black p-2 text-center uppercase">{q.cognitiveLevel}</td>
-                      <td className="border border-black p-2 text-center font-bold">
+                      <td className="border-2 border-black p-2 align-top text-justify">
+                        {q.indicator}
+                      </td>
+                      <td className="border-2 border-black p-2 text-center font-bold uppercase">{q.cognitiveLevel?.split(' - ')[0] || q.cognitiveLevel}</td>
+                      <td className="border-2 border-black p-2 text-center text-[8pt] uppercase">{q.type}</td>
+                      <td className="border-2 border-black p-2 text-center font-bold">{i + 1}</td>
+                      <td className="border-2 border-black p-2 text-center font-bold uppercase text-orange-600">
                         {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}
                       </td>
                     </tr>
@@ -164,23 +178,23 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
               quiz.questions.map((q, i) => {
                 const isNewPassage = q.passage && (i === 0 || quiz.questions[i-1].passage !== q.passage);
                 return (
-                  <div key={q.id} className="pdf-block">
+                  <div key={q.id} className="pdf-block" style={{ pageBreakInside: 'avoid' }}>
                     {isNewPassage && (
-                      <div className="bg-gray-50 border-l-4 border-black p-4 mb-4 italic text-[10pt] text-justify leading-relaxed">
-                        <div className="font-bold uppercase mb-1 not-italic">Stimulus:</div>
+                      <div className="bg-gray-50 border-2 border-black p-5 mb-6 italic text-[10.5pt] text-justify leading-relaxed relative">
+                        <div className="absolute top-0 left-4 -translate-y-1/2 bg-white px-2 text-[8pt] font-black uppercase border border-black tracking-widest">STIMULUS</div>
                         <div dangerouslySetInnerHTML={{ __html: q.passage! }}></div>
                       </div>
                     )}
-                    <div className="flex gap-3 text-[11pt] leading-relaxed">
-                      <div className="font-bold w-6 shrink-0">{i + 1}.</div>
+                    <div className="flex gap-4 text-[11.5pt] leading-relaxed">
+                      <div className="font-bold w-6 shrink-0 text-right">{i + 1}.</div>
                       <div className="flex-1">
-                        <div className="mb-3 text-justify" dangerouslySetInnerHTML={{ __html: q.text }}></div>
+                        <div className="mb-4 text-justify" dangerouslySetInnerHTML={{ __html: q.text }}></div>
                         
-                        {q.options && (
-                          <div className="grid grid-cols-1 gap-2 mb-4">
+                        {q.options && q.options.length > 0 && (
+                          <div className="grid grid-cols-1 gap-2 mb-6 ml-1">
                             {q.options.map(opt => (
-                              <div key={opt.label} className="flex gap-2 items-start">
-                                <span className="font-bold">{opt.label}.</span>
+                              <div key={opt.label} className="flex gap-3 items-start">
+                                <span className="font-bold w-5 shrink-0">{opt.label}.</span>
                                 <span dangerouslySetInnerHTML={{ __html: opt.text }}></span>
                               </div>
                             ))}
@@ -188,13 +202,16 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                         )}
 
                         {(exportMode === 'lengkap' || showAnswer) && (
-                          <div className="bg-emerald-50 border-2 border-emerald-100 p-4 rounded-xl text-[9pt] italic mt-2">
-                            <span className="font-black not-italic text-emerald-700 uppercase">Kunci: {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</span>
-                            <div className="mt-1" dangerouslySetInnerHTML={{ __html: q.explanation }}></div>
+                          <div className="bg-emerald-50 border-2 border-emerald-200 p-5 rounded-3xl text-[9.5pt] italic mt-4 shadow-sm">
+                            <div className="flex items-center gap-3 mb-2">
+                               <span className="bg-emerald-600 text-white px-3 py-1 rounded-full text-[8pt] font-black not-italic uppercase tracking-widest">KUNCI JAWABAN: {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</span>
+                            </div>
+                            <div className="text-emerald-800 leading-relaxed" dangerouslySetInnerHTML={{ __html: q.explanation }}></div>
                           </div>
                         )}
+                        
                         {exportMode === 'soal' && !showAnswer && (
-                          <div className="border-b border-dotted border-gray-400 h-4 w-full opacity-50"></div>
+                          <div className="border-b-2 border-dotted border-gray-300 h-1 w-full opacity-40 mt-4"></div>
                         )}
                       </div>
                     </div>
@@ -202,6 +219,12 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                 );
               })
             )}
+          </div>
+          
+          {/* Footer Preview / Watermark Digital */}
+          <div className="mt-12 pt-4 border-t border-gray-100 text-[8pt] text-gray-400 italic flex justify-between no-print">
+            <span>GenZ QuizGen Pro - AI Powered Academic Engine</span>
+            <span>ID Dokumen: {quiz.id.substring(0,8)}</span>
           </div>
         </div>
       </div>
