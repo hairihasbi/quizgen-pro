@@ -14,7 +14,6 @@ export default async function handler(req: any, res: any) {
     if (req.method === 'GET') {
       const { action, userId, page = '1', limit = '10' } = req.query;
 
-      // Fitur Baru: Cek status Environment Variables secara mendalam
       if (action === 'sys-info') {
         return res.status(200).json({
           resendEnvFound: !!process.env.RESEND_API_KEY,
@@ -82,6 +81,23 @@ export default async function handler(req: any, res: any) {
       });
 
       return res.status(200).json({ id, timestamp });
+    }
+
+    // 4. DELETE: Hapus massal notifikasi
+    if (req.method === 'DELETE') {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ message: 'Array IDs required' });
+      }
+
+      // Membangun query dinamis untuk IN clause
+      const placeholders = ids.map(() => '?').join(',');
+      await db.execute({
+        sql: `DELETE FROM emails WHERE id IN (${placeholders})`,
+        args: ids
+      });
+
+      return res.status(200).json({ success: true, deletedCount: ids.length });
     }
 
     return res.status(405).json({ message: 'Method Not Allowed' });
