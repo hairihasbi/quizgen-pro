@@ -44,10 +44,21 @@ export const EmailService = {
     }
   },
 
-  /**
-   * Mengirim notifikasi. 
-   * @param forceRealEmail Jika true, akan dikirim ke Resend. Jika false (default), hanya masuk Inbox Internal.
-   */
+  deleteNotifications: async (ids: string[]) => {
+    try {
+      await StorageService.deleteEmails(ids);
+      if (!StorageService.isLocal()) {
+        await fetch('/api/notifications', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids })
+        });
+      }
+    } catch (e) {
+      console.error("Delete Notifications Error:", e);
+    }
+  },
+
   send: async (toEmail: string, type: 'success' | 'error' | 'warning' | 'info', subject: string, message: string, forceRealEmail: boolean = false) => {
     try {
       const newNotif: EmailNotification = {
@@ -59,11 +70,7 @@ export const EmailService = {
         timestamp: new Date().toISOString(),
         isRead: false
       };
-
-      // 1. Simpan ke Database (Internal Inbox) - SELALU DILAKUKAN
       await StorageService.addEmail(newNotif);
-
-      // 2. Kirim ke API Email Asli (Resend) - HANYA JIKA DIPAKSA (Misal: Pembayaran / Approval Akun)
       if (!StorageService.isLocal() && forceRealEmail) {
         fetch('/api/send-email', {
           method: 'POST',
@@ -81,9 +88,7 @@ export const EmailService = {
               </div>
             `
           })
-        }).catch(err => console.error("Real email dispatch skipped/failed:", err));
-      } else {
-        console.log(`[NOTIF] Message "${subject}" handled INTERNALLY to save Resend quota.`);
+        }).catch(err => console.error("Real email dispatch failed:", err));
       }
     } catch (e) {
       console.error("Send Notif Error:", e);
@@ -92,25 +97,11 @@ export const EmailService = {
 
   notifyQuizSuccess: async (user: User, quizTitle: string) => {
     const email = user.email || `${user.username}@quizgen.pro`;
-    // Kita set forceRealEmail = false agar hemat kuota Resend
-    await EmailService.send(
-      email, 
-      'success', 
-      '✅ Quiz Berhasil Diterbitkan!', 
-      `Halo ${user.username}, Quiz "${quizTitle}" telah berhasil disusun oleh Gemini AI Engine dan siap digunakan.`,
-      false 
-    );
+    await EmailService.send(email, 'success', '✅ Quiz Berhasil Diterbitkan!', `Halo ${user.username}, Quiz "${quizTitle}" telah berhasil disusun oleh Gemini AI Engine dan siap digunakan.`, false);
   },
 
   notifyUserApproval: async (user: User) => {
     const email = user.email || `${user.username}@quizgen.pro`;
-    // Gunakan forceRealEmail = true agar guru tahu akunnya sudah aktif lewat email asli
-    await EmailService.send(
-      email,
-      'success',
-      '🎉 Selamat! Akun QuizGen Pro Anda Telah Aktif',
-      `Halo ${user.fullName || user.username},\n\nPendaftaran Anda telah disetujui oleh tim Admin. Anda sekarang dapat masuk ke portal guru untuk mulai membuat soal otomatis menggunakan Gemini 3 Pro AI Engine.\n\nSebagai bonus awal, kami telah menambahkan 2 Kredit Gratis ke akun Anda.\n\nSelamat berkarya!`,
-      true
-    );
+    await EmailService.send(email, 'success', '🎉 Selamat! Akun QuizGen Pro Anda Telah Aktif', `Halo ${user.fullName || user.username},\n\nPendaftaran Anda telah disetujui oleh tim Admin. Anda sekarang dapat masuk ke portal guru untuk mulai membuat soal otomatis menggunakan Gemini 3 Pro AI Engine.\n\nSebagai bonus awal, kami telah menambahkan 2 Kredit Gratis ke akun Anda.\n\nSelamat berkarya!`, true);
   }
 };
