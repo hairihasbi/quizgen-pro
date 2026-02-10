@@ -76,7 +76,6 @@ export class RealtimeService {
     const now = () => new Date().toISOString();
 
     if (channelId.startsWith('notif_')) {
-      // Simulasi Notifikasi Selamat Datang Real-time (Hanya untuk Demo)
       emit({ 
         step: 'NOTIFICATION_RECEIVED', 
         percentage: 100, 
@@ -93,7 +92,6 @@ export class RealtimeService {
         timestamp: now() 
       }, 2000);
     } else {
-      // Simulasi Progress AI (Existing Logic)
       emit({ step: 'INITIALIZING', percentage: 5, message: 'Menghubungkan ke Neural Engine...', timestamp: now() }, 200);
       emit({ step: 'RAG_SCAN', percentage: 15, message: 'Melakukan pemindaian Bank Soal (RAG)...', details: 'Scanning curriculum vectors', timestamp: now() }, 1000);
       emit({ step: 'BATCH_PROCESS', percentage: 40, message: 'Menyusun draf soal Tahap 1...', details: 'Applying Bloom Taxonomy', timestamp: now() }, 3000);

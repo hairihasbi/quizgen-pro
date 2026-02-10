@@ -83,8 +83,9 @@ export const StorageService = {
       ["deriveBits", "deriveKey"]
     );
 
+    // FIX: Gunakan casting 'as any' untuk menghindari error tipe data di Vercel
     const hash = await window.crypto.subtle.deriveBits(
-      { name: "PBKDF2", salt: salt, iterations: iterations, hash: "SHA-256" },
+      { name: "PBKDF2", salt: salt as any, iterations: iterations, hash: "SHA-256" },
       keyMaterial,
       256
     );
@@ -113,8 +114,9 @@ export const StorageService = {
         ["deriveBits", "deriveKey"]
       );
 
+      // FIX: Gunakan casting 'as any' untuk menghindari error tipe data di Vercel
       const derivedBits = await window.crypto.subtle.deriveBits(
-        { name: "PBKDF2", salt: salt, iterations: iterations, hash: "SHA-256" },
+        { name: "PBKDF2", salt: salt as any, iterations: iterations, hash: "SHA-256" },
         keyMaterial,
         256
       );
@@ -132,7 +134,6 @@ export const StorageService = {
     return bytes;
   },
 
-  // Added localGet helper to fix missing property errors
   localGet: (key: string): any => {
     const data = localStorage.getItem(`quizgen_${key}`);
     try {
@@ -142,7 +143,6 @@ export const StorageService = {
     }
   },
 
-  // Added localSet helper to fix missing property errors
   localSet: (key: string, value: any) => {
     localStorage.setItem(`quizgen_${key}`, JSON.stringify(value));
   },
