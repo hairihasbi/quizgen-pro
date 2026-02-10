@@ -280,6 +280,12 @@ export const StorageService = {
     if (!client || _isLocal) return StorageService.localGet('transactions').filter((t: any) => !userId || t.userId === userId);
     try { const sql = userId ? "SELECT * FROM transactions WHERE userId = ? ORDER BY createdAt DESC" : "SELECT * FROM transactions ORDER BY createdAt DESC"; const res = await client.execute({ sql, args: userId ? [userId] : [] }); return res.rows.map((row: any) => ({ id: row.id, userId: row.userId, amount: Number(row.amount), credits: Number(row.credits), status: row.status as any, externalId: row.externalId, createdAt: row.createdAt })); } catch(e) { return StorageService.localGet('transactions'); }
   },
+  deleteTransaction: async (id: string) => {
+    const local = StorageService.localGet('transactions');
+    StorageService.localSet('transactions', local.filter((t: any) => t.id !== id));
+    const client = StorageService.getClient();
+    if (client && !_isLocal) { try { await client.execute({ sql: "DELETE FROM transactions WHERE id = ?", args: [id] }); } catch(e){} }
+  },
   updateUserCredits: async (userId: string, amount: number) => {
     const users = StorageService.localGet('users');
     const idx = users.findIndex((u: any) => u.id === userId);
