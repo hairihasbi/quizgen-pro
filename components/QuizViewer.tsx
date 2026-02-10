@@ -21,7 +21,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
       if ((window as any).observeMathItems) {
         (window as any).observeMathItems('quiz-print-area');
       }
-    }, 150);
+    }, 200);
     return () => clearTimeout(timer);
   }, [quiz, showAnswer, exportMode]);
 
@@ -53,42 +53,32 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
 
   const handleNativePrint = async () => {
     if ((window as any).MathJax && (window as any).MathJax.typesetPromise) {
-        await (window as any).MathJax.typesetPromise();
+        await (window as any).MathJax.typesetPromise([document.getElementById('quiz-print-area')]);
     }
     setTimeout(() => {
       window.print();
-    }, 500);
+    }, 800);
   };
 
   const handleDownloadPdf = async () => {
     const element = document.getElementById('quiz-print-area');
-    const scrollContainer = document.querySelector('.print-scroll-container');
     if (!element) return;
 
     setIsDownloading(true);
 
     try {
-      // 1. Pastikan area render terlihat sepenuhnya di viewport untuk snapshot yang stabil
-      if (scrollContainer) scrollContainer.scrollTop = 0;
-
-      // 2. Sinkronisasi paksa MathJax dengan Typeset Promise
+      // 1. Sinkronisasi paksa MathJax sebelum snapshot
       if ((window as any).MathJax && (window as any).MathJax.typesetPromise) {
         await (window as any).MathJax.typesetPromise([element]);
       }
 
-      // 3. Delay tambahan untuk sinkronisasi paint browser (Chrome/Edge rendering lag)
-      // Menggunakan double requestAnimationFrame + setTimeout untuk kepastian render formula
-      await new Promise(resolve => {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            setTimeout(resolve, 1500); // 1.5 detik delay untuk rendering formula kompleks
-          });
-        });
-      });
+      // 2. Tunggu browser selesai melakukan 'Paint' SVG
+      // Menggunakan delay 2 detik untuk memastikan tidak blank
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // 4. Konfigurasi Presisi A4 untuk html2pdf
+      // 3. Konfigurasi Standar Industri A4
       const opt = {
-        margin: [10, 10, 10, 10], // Margin 10mm di PDF
+        margin: 0, // Kita sudah pakai padding 22mm di CSS kontainer
         filename: `Quiz_${quiz.title.replace(/\s+/g, '_')}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { 
@@ -96,21 +86,20 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
           useCORS: true, 
           logging: false,
           letterRendering: true,
-          // Lebar window disesuaikan agar aspek rasio A4 (210mm) konsisten
-          windowWidth: 794, 
           scrollY: 0,
-          scrollX: 0
+          scrollX: 0,
+          windowWidth: element.clientWidth, // Memastikan canvas menangkap lebar kontainer yang benar
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['css', 'legacy'], avoid: ['.pdf-block', 'tr', 'h1', 'h2', 'h3', '.identitas-box'] }
       };
 
-      // 5. Eksekusi Download
+      // 4. Eksekusi proses unduh
       const worker = (window as any).html2pdf().from(element).set(opt);
       await worker.save();
     } catch (err) {
-      console.error("PDF Download Error:", err);
-      alert("Gagal mengunduh PDF. Pastikan koneksi stabil dan formula matematika sudah ter-render.");
+      console.error("PDF Error:", err);
+      alert("Gagal mengunduh PDF. Pastikan seluruh konten sudah muncul di layar.");
     } finally {
       setIsDownloading(false);
     }
@@ -125,18 +114,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
       alert("Gagal ekspor: " + err.message);
     } finally {
       setIsExporting(false);
-    }
-  };
-
-  const handleExportToGoogleDocs = async () => {
-    setIsExportingDocs(true);
-    try {
-      const docUrl = await GoogleDocsService.exportToDocs(quiz);
-      window.open(docUrl, '_blank');
-    } catch (err: any) {
-      alert("Gagal ekspor: " + err.message);
-    } finally {
-      setIsExportingDocs(false);
     }
   };
 
@@ -158,8 +135,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
              <button onClick={() => { setExportMode('kisi-kisi'); setShowAnswer(false); }} className={`px-4 py-2 rounded-xl text-[9px] font-black transition-all ${exportMode === 'kisi-kisi' ? 'bg-white text-orange-600 shadow-sm' : 'text-orange-300'}`}>KISI-KISI</button>
              <button onClick={() => { setExportMode('lengkap'); setShowAnswer(true); }} className={`px-4 py-2 rounded-xl text-[9px] font-black transition-all ${exportMode === 'lengkap' ? 'bg-white text-orange-600 shadow-sm' : 'text-orange-300'}`}>LENGKAP</button>
           </div>
-          <button onClick={handleExportToGoogleDocs} disabled={isExportingDocs} className="px-6 py-3 bg-[#4285f4] text-white rounded-2xl text-[10px] font-black shadow-xl uppercase transition-all hover:scale-105">📄 Docs</button>
-          <button onClick={handleExportToGoogleForms} disabled={isExporting} className="px-6 py-3 bg-[#673ab7] text-white rounded-2xl text-[10px] font-black shadow-xl uppercase transition-all hover:scale-105">📝 Forms</button>
           
           <button onClick={handleDownloadPdf} disabled={isDownloading} className="px-6 py-3 bg-gray-800 text-white rounded-2xl text-[10px] font-black shadow-xl uppercase transition-all hover:scale-105 flex items-center gap-2">
             {isDownloading ? <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin"></div> : '📥'} PDF
@@ -171,38 +146,54 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
       </header>
 
       <div className="flex-1 overflow-y-auto p-0 md:p-10 flex justify-center custom-scrollbar print-scroll-container">
-        <div id="quiz-print-area" className="print-container bg-white shadow-2xl text-gray-900 w-[210mm] min-h-screen py-[15mm] px-[20mm] box-border print:py-0 print:px-0">
+        <div id="quiz-print-area" className="print-container bg-white shadow-2xl text-gray-900 w-[210mm] min-h-screen box-border overflow-hidden">
           
           {/* HEADER / KOP SOAL */}
           <div className="border-b-[4px] border-double border-gray-900 pb-3 mb-6 text-center w-full box-border">
-             <h1 className="text-2xl font-black uppercase tracking-tight text-gray-900 leading-tight">{quiz.title}</h1>
+             <h1 className="text-2xl font-black uppercase tracking-tight text-gray-900">{quiz.title}</h1>
              <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-gray-600 mt-1">
                 {quiz.subject} | {quiz.level} {quiz.grade}
              </div>
           </div>
 
-          {/* DATA SISWA - Menggunakan width 100% dan box-sizing border-box agar tidak terpotong margin kanan */}
-          <div className="identitas-box grid grid-cols-2 gap-x-8 gap-y-4 p-5 border-[3px] border-gray-900 rounded-xl mb-8 w-full box-border mx-auto">
-             <div className="flex items-center gap-3">
-                <span className="w-16 shrink-0 font-black text-[10px] text-gray-600 uppercase">NAMA</span>
-                <span className="font-black text-gray-900">:</span>
-                <div className="flex-1 border-b-2 border-dotted border-gray-400 h-4"></div>
-             </div>
-             <div className="flex items-center gap-3">
-                <span className="w-16 shrink-0 font-black text-[10px] text-gray-600 uppercase">HARI / TGL</span>
-                <span className="font-black text-gray-900">:</span>
-                <div className="flex-1 border-b-2 border-dotted border-gray-400 h-4"></div>
-             </div>
-             <div className="flex items-center gap-3">
-                <span className="w-16 shrink-0 font-black text-[10px] text-gray-600 uppercase">KELAS</span>
-                <span className="font-black text-gray-900">:</span>
-                <div className="flex-1 border-b-2 border-dotted border-gray-400 h-4"></div>
-             </div>
-             <div className="flex items-center gap-3">
-                <span className="w-16 shrink-0 font-black text-[10px] text-gray-600 uppercase">NO. ABSEN</span>
-                <span className="font-black text-gray-900">:</span>
-                <div className="flex-1 border-b-2 border-dotted border-gray-400 h-4"></div>
-             </div>
+          {/* DATA SISWA - Layout Fixed Table agar tidak meluber keluar margin 2.2cm */}
+          <div className="identitas-box mb-8 w-full box-border">
+            <table className="fixed-table border-[3px] border-gray-900 rounded-xl overflow-hidden">
+              <tbody>
+                <tr>
+                  <td className="p-4 w-1/2 border-r-[2px] border-gray-900">
+                    <div className="flex items-center gap-2">
+                      <span className="w-16 shrink-0 font-black text-[10px] text-gray-600 uppercase">NAMA</span>
+                      <span className="font-black text-gray-900">:</span>
+                      <div className="flex-1 border-b-2 border-dotted border-gray-400 h-4"></div>
+                    </div>
+                  </td>
+                  <td className="p-4 w-1/2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-20 shrink-0 font-black text-[10px] text-gray-600 uppercase">HARI / TGL</span>
+                      <span className="font-black text-gray-900">:</span>
+                      <div className="flex-1 border-b-2 border-dotted border-gray-400 h-4"></div>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="p-4 w-1/2 border-r-[2px] border-gray-900 border-t-[2px]">
+                    <div className="flex items-center gap-2">
+                      <span className="w-16 shrink-0 font-black text-[10px] text-gray-600 uppercase">KELAS</span>
+                      <span className="font-black text-gray-900">:</span>
+                      <div className="flex-1 border-b-2 border-dotted border-gray-400 h-4"></div>
+                    </div>
+                  </td>
+                  <td className="p-4 w-1/2 border-t-[2px] border-gray-900">
+                    <div className="flex items-center gap-2">
+                      <span className="w-20 shrink-0 font-black text-[10px] text-gray-600 uppercase">NO. ABSEN</span>
+                      <span className="font-black text-gray-900">:</span>
+                      <div className="flex-1 border-b-2 border-dotted border-gray-400 h-4"></div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
           {/* AREA KONTEN */}
@@ -230,9 +221,9 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                           <div className="flex-1 min-w-0">
                             <div className={`mjx-item text-gray-900 font-bold leading-relaxed text-[13px] text-justify pb-2 w-full break-words ${getFontClass(quiz.subject)}`} dangerouslySetInnerHTML={{ __html: sanitizeHTML(q.text) }}></div>
                             {q.options && (
-                              <div className="options-grid w-full">
+                              <div className="options-grid w-full box-border">
                                 {q.options.map(opt => (
-                                  <div key={opt.label} className="flex gap-2 items-start w-full overflow-hidden">
+                                  <div key={opt.label} className="flex gap-2 items-start w-full overflow-hidden box-border">
                                     <span className="font-black text-gray-900 w-6 h-6 flex items-center justify-center rounded-lg border border-gray-400 text-[10px] shrink-0">{opt.label}</span>
                                     <div className={`mjx-item font-semibold text-gray-800 text-[12px] pt-0.5 flex-1 min-w-0 ${getFontClass(quiz.subject)}`} dangerouslySetInnerHTML={{ __html: sanitizeHTML(opt.text) }}></div>
                                   </div>
@@ -253,19 +244,19 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
               </div>
             )}
 
-            {/* TABEL KISI-KISI - Diperbaiki lebarnya agar tidak terpotong (table-fixed dengan px lebar kolom yang aman) */}
+            {/* TABEL KISI-KISI - Fixed Width dengan Persentase untuk mencegah Overflow */}
             {exportMode === 'kisi-kisi' && (
-              <div className="mt-8 w-full box-border overflow-visible">
+              <div className="mt-8 w-full box-border overflow-hidden">
                 <h3 className="text-lg font-black text-gray-900 uppercase border-b-2 border-gray-900 mb-6 pb-2 text-center">Kisi-kisi Instrumen Penilaian</h3>
-                <table className="w-full border-collapse border-[2.5px] border-gray-900 text-[9px] table-fixed">
+                <table className="fixed-table border-[2.5px] border-gray-900 text-[9px]">
                   <thead>
                     <tr className="bg-gray-100 print:bg-gray-50">
-                      <th className="border-2 border-gray-900 p-1 w-[35px] text-center font-black uppercase">No</th>
-                      <th className="border-2 border-gray-900 p-1 text-center w-[110px] font-black uppercase">KD / TP</th>
-                      <th className="border-2 border-gray-900 p-1 text-center w-[90px] font-black uppercase">Materi</th>
-                      <th className="border-2 border-gray-900 p-1 text-center font-black uppercase">Indikator</th>
-                      <th className="border-2 border-gray-900 p-1 w-[45px] text-center font-black uppercase">Level</th>
-                      <th className="border-2 border-gray-900 p-1 w-[65px] text-center font-black uppercase">Bentuk</th>
+                      <th className="border-2 border-gray-900 p-1 w-[8%] text-center font-black uppercase">No</th>
+                      <th className="border-2 border-gray-900 p-1 text-center w-[25%] font-black uppercase">KD / TP</th>
+                      <th className="border-2 border-gray-900 p-1 text-center w-[15%] font-black uppercase">Materi</th>
+                      <th className="border-2 border-gray-900 p-1 text-center w-[30%] font-black uppercase">Indikator</th>
+                      <th className="border-2 border-gray-900 p-1 w-[10%] text-center font-black uppercase">Level</th>
+                      <th className="border-2 border-gray-900 p-1 w-[12%] text-center font-black uppercase">Bentuk</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -274,7 +265,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                         <td className="border-2 border-gray-900 p-2 text-center font-bold">{i + 1}</td>
                         <td className="border-2 border-gray-900 p-2 text-justify leading-tight">{q.competency || "-"}</td>
                         <td className="border-2 border-gray-900 p-2 text-center leading-tight">{q.topic || "-"}</td>
-                        <td className="border-2 border-gray-900 p-2 text-justify leading-relaxed break-words overflow-visible">
+                        <td className="border-2 border-gray-900 p-2 text-justify leading-relaxed break-words">
                           <div className="mjx-item">{q.indicator}</div>
                         </td>
                         <td className="border-2 border-gray-900 p-2 text-center whitespace-nowrap">{getCognitiveLevelMapping(q.cognitiveLevel)}</td>
