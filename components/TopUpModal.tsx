@@ -14,11 +14,11 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ user, onClose, onSuccess }) => 
   const [loading, setLoading] = useState<string | null>(null);
   const [packages, setPackages] = useState<PaymentPackage[]>([]);
   const [isFetching, setIsFetching] = useState(true);
+  const [errorHint, setErrorHint] = useState<string | null>(null);
 
   useEffect(() => {
     const loadPackages = async () => {
       const settings = await StorageService.getPaymentSettings();
-      // Hanya tampilkan paket yang aktif
       setPackages(settings.packages.filter(p => p.isActive));
       setIsFetching(false);
     };
@@ -27,6 +27,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ user, onClose, onSuccess }) => 
 
   const handleCheckout = async (pkg: PaymentPackage) => {
     setLoading(pkg.id);
+    setErrorHint(null);
     try {
       const url = await DokuService.createInvoice(user, { 
         amount: pkg.price, 
@@ -35,8 +36,8 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ user, onClose, onSuccess }) => 
       });
       onSuccess(url);
     } catch (err: any) {
-      // PERBAIKAN: Tampilkan pesan error asli untuk memudahkan diagnosa (misal: "Client ID Not Found")
-      alert(`Gagal memproses pembayaran: ${err.message || 'Terjadi kesalahan sistem.'}`);
+      setErrorHint(err.message);
+      console.error("Topup UI Error:", err);
     } finally {
       setLoading(null);
     }
@@ -77,9 +78,16 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ user, onClose, onSuccess }) => 
         <div className="flex-1 p-8 md:p-12 space-y-8 bg-gray-50/50 relative">
           <button onClick={onClose} className="absolute top-8 right-8 text-gray-300 hover:text-gray-600 transition-colors text-2xl">✕</button>
           
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center text-xl">🛒</div>
-            <h4 className="text-xl font-black text-gray-800 uppercase tracking-tight">Pilih Paket Kredit</h4>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center text-xl">🛒</div>
+              <h4 className="text-xl font-black text-gray-800 uppercase tracking-tight">Pilih Paket Kredit</h4>
+            </div>
+            {errorHint && (
+              <div className="mt-2 p-4 bg-rose-50 border border-rose-100 rounded-2xl text-rose-600 text-[10px] font-black uppercase tracking-widest animate-shake">
+                ⚠️ Error: {errorHint}
+              </div>
+            )}
           </div>
 
           {isFetching ? (
@@ -93,7 +101,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ user, onClose, onSuccess }) => 
                   key={pkg.id}
                   onClick={() => handleCheckout(pkg)}
                   disabled={!!loading}
-                  className={`relative group bg-white p-6 rounded-[2rem] border-2 border-transparent hover:border-orange-500 hover:shadow-xl transition-all text-left overflow-hidden flex flex-col h-full`}
+                  className={`relative group bg-white p-6 rounded-[2rem] border-2 border-transparent hover:border-orange-500 hover:shadow-xl transition-all text-left overflow-hidden flex flex-col h-full ${loading === pkg.id ? 'opacity-50' : ''}`}
                 >
                   <div className="flex items-start justify-between mb-4">
                     <span className="text-3xl">{getPackageIcon(idx)}</span>
