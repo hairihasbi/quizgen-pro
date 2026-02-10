@@ -18,26 +18,31 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
       if ((window as any).observeMathItems) {
         (window as any).observeMathItems('quiz-print-area');
       }
-    }, 800);
+    }, 500);
     return () => clearTimeout(timer);
   }, [quiz, showAnswer, exportMode]);
 
-  const handleExportPdfClient = () => {
+  const handleExportPdfClient = async () => {
     const element = document.getElementById('quiz-print-area');
     if (!element || !(window as any).html2pdf) {
-      alert("Library PDF belum siap, silakan tunggu sebentar.");
+      alert("Library PDF belum siap.");
       return;
     }
 
     setIsClientExporting(true);
+
+    // Pastikan MathJax selesai merender ulang area cetak sebelum dicapture
+    if ((window as any).MathJax && (window as any).MathJax.typesetPromise) {
+      await (window as any).MathJax.typesetPromise([element]);
+    }
     
     const opt = {
-      margin: [10, 10, 10, 10],
+      margin: 10,
       filename: `Quiz_${quiz.title.replace(/\s+/g, '_')}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { 
         scale: 2, 
-        useCORS: true, 
+        useCORS: true,
         letterRendering: true,
         logging: false
       },
@@ -50,7 +55,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
     }).catch((err: any) => {
       console.error(err);
       setIsClientExporting(false);
-      alert("Gagal export PDF: " + err.message);
+      alert("Gagal export: " + err.message);
     });
   };
 
@@ -75,12 +80,12 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Quiz_${quiz.title.replace(/\s+/g, '_')}_SSR.pdf`;
+      a.download = `Quiz_${quiz.title.replace(/\s+/g, '_')}_Pro.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (err: any) {
-      alert("Error: " + err.message);
+      alert("Error Server: " + err.message);
     } finally {
       setIsDownloading(false);
     }
@@ -94,7 +99,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
           <div className="w-14 h-14 orange-gradient rounded-2xl flex items-center justify-center text-white text-3xl shadow-lg">📄</div>
           <div>
             <h2 className="font-black text-gray-800 uppercase text-xs tracking-tight truncate max-w-[280px]">{quiz.title}</h2>
-            <div className="text-[9px] font-black text-orange-500 uppercase mt-1 tracking-widest">MODE: {exportMode.toUpperCase()}</div>
+            <div className="text-[9px] font-black text-orange-500 uppercase mt-1 tracking-widest">PREVIEW: {exportMode.toUpperCase()}</div>
           </div>
         </div>
         
@@ -113,7 +118,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
             {isClientExporting ? (
               <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
             ) : (
-              <><span>📥</span><span>Export PDF</span></>
+              <><span>📥</span><span>PDF (Instan)</span></>
             )}
           </button>
 
@@ -125,7 +130,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
             {isDownloading ? (
               <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
             ) : (
-              <><span>☁️</span><span>PDF (Server)</span></>
+              <><span>☁️</span><span>PDF (Engine)</span></>
             )}
           </button>
 
@@ -137,14 +142,16 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
       <div className="flex-1 overflow-y-auto p-0 md:p-12 flex justify-center custom-scrollbar print-scroll-container">
         <div id="quiz-print-area" className="print-container bg-white text-gray-900 shadow-none border-none">
           
+          {/* Header Identitas Sekolah */}
           <div className="text-center mb-1">
-            <h1 className="text-xl font-black uppercase tracking-tighter m-0" style={{fontFamily: 'Plus Jakarta Sans'}}>BANK SOAL KURIKULUM MERDEKA</h1>
-            <h2 className="text-lg font-bold uppercase m-0" style={{fontFamily: 'Plus Jakarta Sans'}}>{quiz.subject} - {quiz.grade}</h2>
+            <h1 className="text-xl font-black m-0" style={{fontFamily: 'Plus Jakarta Sans'}}>BANK SOAL KURIKULUM MERDEKA</h1>
+            <h2 className="text-lg font-bold m-0" style={{fontFamily: 'Plus Jakarta Sans'}}>{quiz.subject.toUpperCase()} - {quiz.grade.toUpperCase()}</h2>
             <div className="text-[9pt] font-medium tracking-widest text-gray-500 uppercase mt-1">Evaluasi Capaian Pembelajaran 2024/2025</div>
           </div>
           
           <div className="border-t-[3px] border-b border-black h-[5px] mb-6"></div>
 
+          {/* Tabel Informasi Identitas */}
           <table className="w-full mb-8 text-[10.5pt] font-bold border-collapse">
             <tbody>
               <tr>
@@ -156,7 +163,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                 <td className="py-1 text-right">Target</td><td className="py-1 text-center">:</td><td className="py-1">{quiz.questions.length} Butir Soal</td>
               </tr>
               <tr>
-                <td className="py-1">Materi Utama</td><td className="py-1 text-center">:</td><td className="py-1" colSpan={4}>{quiz.topic}</td>
+                <td className="py-1">Topik Pembelajaran</td><td className="py-1 text-center">:</td><td className="py-1" colSpan={4}>{quiz.topic}</td>
               </tr>
             </tbody>
           </table>
@@ -167,13 +174,14 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
 
           <div className="space-y-8">
             {exportMode === 'kisi-kisi' ? (
+              /* TABEL KISI-KISI SUPER LENGKAP */
               <table className="w-full border-collapse border-2 border-black text-[8.5pt]">
                 <thead>
                   <tr className="bg-gray-100">
                     <th className="border-2 border-black p-2 w-8 text-center uppercase">No</th>
-                    <th className="border-2 border-black p-2 w-48 text-left uppercase">Materi / Konten</th>
-                    <th className="border-2 border-black p-2 text-left uppercase">Indikator Soal</th>
-                    <th className="border-2 border-black p-2 w-20 text-center uppercase">Level</th>
+                    <th className="border-2 border-black p-2 w-44 text-left uppercase">Lingkup Materi</th>
+                    <th className="border-2 border-black p-2 text-left uppercase">Indikator Pencapaian Soal</th>
+                    <th className="border-2 border-black p-2 w-16 text-center uppercase">Level</th>
                     <th className="border-2 border-black p-2 w-24 text-center uppercase">Bentuk</th>
                     <th className="border-2 border-black p-2 w-12 text-center uppercase">No Soal</th>
                     <th className="border-2 border-black p-2 w-16 text-center uppercase">Kunci</th>
@@ -200,6 +208,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                 </tbody>
               </table>
             ) : (
+              /* URAIAN SOAL */
               quiz.questions.map((q, i) => {
                 const isNewPassage = q.passage && (i === 0 || quiz.questions[i-1].passage !== q.passage);
                 return (
@@ -227,16 +236,16 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                         )}
 
                         {(exportMode === 'lengkap' || showAnswer) && (
-                          <div className="bg-emerald-50 border-2 border-emerald-200 p-5 rounded-3xl text-[9.5pt] italic mt-4">
+                          <div className="bg-emerald-50 border-2 border-emerald-200 p-5 rounded-3xl text-[9.5pt] italic mt-4 shadow-sm">
                             <div className="flex items-center gap-3 mb-2">
-                               <span className="bg-emerald-600 text-white px-3 py-1 rounded-full text-[8pt] font-black not-italic uppercase tracking-widest">KUNCI JAWABAN: {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</span>
+                               <span className="bg-emerald-600 text-white px-3 py-1 rounded-full text-[8pt] font-black not-italic uppercase tracking-widest">KUNCI: {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</span>
                             </div>
                             <div className="text-emerald-800 leading-relaxed" dangerouslySetInnerHTML={{ __html: q.explanation }}></div>
                           </div>
                         )}
                         
                         {exportMode === 'soal' && !showAnswer && (
-                          <div className="border-b-2 border-dotted border-gray-300 h-1 w-full opacity-40 mt-6"></div>
+                          <div className="border-b-2 border-dotted border-gray-300 h-1 w-full opacity-30 mt-6"></div>
                         )}
                       </div>
                     </div>
@@ -246,9 +255,10 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
             )}
           </div>
           
-          <div className="mt-12 pt-4 border-t border-gray-100 text-[8pt] text-gray-400 italic flex justify-between no-print">
-            <span>GenZ QuizGen Pro - Engine Versi 3.1.0</span>
-            <span>ID Dokumen: {quiz.id.substring(0,8).toUpperCase()}</span>
+          {/* Footer Preview Digital */}
+          <div className="mt-16 pt-4 border-t border-gray-100 text-[8pt] text-gray-400 italic flex justify-between no-print">
+            <span>GenZ QuizGen Pro - AI Powered Academic Engine v3.1.0</span>
+            <span>Doc ID: {quiz.id.substring(0,8).toUpperCase()}</span>
           </div>
         </div>
       </div>
