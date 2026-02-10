@@ -11,6 +11,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
   const [showAnswer, setShowAnswer] = useState(false);
   const [exportMode, setExportMode] = useState<'soal' | 'kisi-kisi' | 'lengkap'>('soal');
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isClientExporting, setIsClientExporting] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -20,6 +21,38 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
     }, 800);
     return () => clearTimeout(timer);
   }, [quiz, showAnswer, exportMode]);
+
+  const handleExportPdfClient = () => {
+    const element = document.getElementById('quiz-print-area');
+    if (!element || !(window as any).html2pdf) {
+      alert("Library PDF belum siap, silakan tunggu sebentar.");
+      return;
+    }
+
+    setIsClientExporting(true);
+    
+    const opt = {
+      margin: [10, 10, 10, 10],
+      filename: `Quiz_${quiz.title.replace(/\s+/g, '_')}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { 
+        scale: 2, 
+        useCORS: true, 
+        letterRendering: true,
+        logging: false
+      },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+
+    (window as any).html2pdf().set(opt).from(element).save().then(() => {
+      setIsClientExporting(false);
+    }).catch((err: any) => {
+      console.error(err);
+      setIsClientExporting(false);
+      alert("Gagal export PDF: " + err.message);
+    });
+  };
 
   const handleDownloadPdfSSR = async () => {
     setIsDownloading(true);
@@ -42,7 +75,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Quiz_${quiz.title.replace(/\s+/g, '_')}.pdf`;
+      a.download = `Quiz_${quiz.title.replace(/\s+/g, '_')}_SSR.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -73,13 +106,27 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
           </div>
           
           <button 
+            onClick={handleExportPdfClient} 
+            disabled={isClientExporting} 
+            className="px-8 py-4 bg-orange-600 text-white rounded-2xl text-[10px] font-black shadow-xl transition-all hover:scale-105 active:scale-95 flex items-center gap-3 disabled:opacity-50"
+          >
+            {isClientExporting ? (
+              <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+            ) : (
+              <><span>📥</span><span>Export PDF</span></>
+            )}
+          </button>
+
+          <button 
             onClick={handleDownloadPdfSSR} 
             disabled={isDownloading} 
             className="px-8 py-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black shadow-xl transition-all hover:scale-105 active:scale-95 flex items-center gap-3 disabled:opacity-50"
           >
             {isDownloading ? (
               <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-            ) : '📥 PDF (Server)'}
+            ) : (
+              <><span>☁️</span><span>PDF (Server)</span></>
+            )}
           </button>
 
           <button onClick={() => window.print()} className="px-8 py-4 orange-gradient text-white rounded-2xl text-[10px] font-black shadow-xl hover:scale-105 transition-all">🖨️ Cetak</button>
