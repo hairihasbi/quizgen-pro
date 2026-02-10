@@ -84,7 +84,7 @@ export const StorageService = {
     );
 
     const hash = await window.crypto.subtle.deriveBits(
-      { name: "PBKDF2", salt: salt.buffer, iterations: iterations, hash: "SHA-256" },
+      { name: "PBKDF2", salt: salt, iterations: iterations, hash: "SHA-256" },
       keyMaterial,
       256
     );
@@ -114,7 +114,7 @@ export const StorageService = {
       );
 
       const derivedBits = await window.crypto.subtle.deriveBits(
-        { name: "PBKDF2", salt: salt.buffer, iterations: iterations, hash: "SHA-256" },
+        { name: "PBKDF2", salt: salt, iterations: iterations, hash: "SHA-256" },
         keyMaterial,
         256
       );
@@ -536,7 +536,7 @@ export const StorageService = {
     StorageService.localSet('users', local.filter((u: any) => u.id !== id));
     const client = StorageService.getClient();
     if (client && !_isLocal) {
-      try { await client.execute({ sql: "DELETE FROM users WHERE id = ?", args: [id] }); } catch(e) {}
+      try { await client.execute({ sql: "DELETE FROM users WHERE id = ?", args: [id] }); } catch(e) { }
     }
   },
 
