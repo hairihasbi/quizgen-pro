@@ -19,8 +19,7 @@
                 processEscapes: true 
             },
             svg: { 
-                fontCache: 'global',
-                minScale: 80 // Mencegah formula terlalu kecil
+                fontCache: 'global' 
             },
             options: { 
                 enableMenu: false, 
@@ -66,7 +65,7 @@
     <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
     
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #fffaf0; margin: 0; padding: 0; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #fffaf0; }
         .font-arabic { font-family: 'Amiri', serif; }
         .font-jp { font-family: 'Noto Sans JP', sans-serif; }
         .font-kr { font-family: 'Noto Serif KR', serif; }
@@ -80,12 +79,10 @@
             margin: 0 0.15em !important; 
             line-height: normal !important;
             max-width: 100% !important;
-            overflow-x: visible !important;
-            overflow-y: hidden !important;
         }
         mjx-container[display="true"] {
             display: block !important;
-            margin: 1.2em auto !important;
+            margin: 1em auto !important;
             text-align: center;
         }
 
@@ -97,25 +94,28 @@
             width: 100%;
         }
         
-        /* A4 Page Calibration - 210mm x 297mm */
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #ff8c00; border-radius: 10px; }
+
+        /* A4 Page Calibration */
         .print-container {
             width: 210mm;
             min-height: 297mm;
-            /* Margin 2.2cm = 22mm pada setiap sisi */
-            padding: 22mm !important;
+            padding: 15mm 20mm;
             margin: 0 auto;
             background: white;
-            box-sizing: border-box !important; /* WAJIB agar padding tidak menambah lebar */
+            box-sizing: border-box;
             position: relative;
-            overflow: hidden;
-            color: black;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
         }
 
-        /* PDF & Print Specific CSS */
+        /* PDF & Print Calibration */
         @media print {
             @page { 
                 size: A4 portrait; 
-                margin: 0; /* Margin diatur oleh .print-container padding */
+                margin: 0; 
             }
             body { background: white !important; }
             #root > *:not(.print-modal-wrapper) { display: none !important; }
@@ -123,11 +123,13 @@
             
             .print-container {
                 width: 210mm !important;
+                height: auto !important;
                 margin: 0 !important;
-                padding: 22mm !important;
+                padding: 15mm 20mm !important;
                 box-shadow: none !important;
                 border: none !important;
-                display: block !important;
+                overflow: visible !important;
+                background: white !important;
                 box-sizing: border-box !important;
             }
 
@@ -136,20 +138,25 @@
                 page-break-inside: avoid !important;
                 width: 100% !important;
                 display: block !important;
-                box-sizing: border-box !important;
             }
 
             table { 
                 width: 100% !important; 
                 table-layout: fixed !important; 
                 border-collapse: collapse !important; 
-                box-sizing: border-box !important;
+                word-wrap: break-word !important;
             }
             
             td, th { 
                 word-wrap: break-word !important; 
                 overflow-wrap: break-word !important;
+                padding: 8px !important;
             }
+        }
+
+        /* Custom scrollbar for preview */
+        .print-scroll-container {
+            scroll-behavior: smooth;
         }
     </style>
 <script type="importmap">
