@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -147,22 +146,46 @@
                 margin: 10mm 15mm;
                 size: auto;
             }
-            body { background: white !important; margin: 0 !important; padding: 0 !important; }
+            
+            html, body, #root {
+                height: auto !important;
+                overflow: visible !important;
+                background: white !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
             .no-print { display: none !important; }
             
-            /* CSS Fix: Jangan sembunyikan root secara brutal, sembunyikan element non-print saja */
-            header, aside, .no-print-area { display: none !important; }
-            
+            /* Sembunyikan semua elemen navigasi luar */
+            aside, header, nav, .main-layout-header { display: none !important; }
+
+            /* Paksa modal untuk tidak menjadi 'fixed' agar bisa diprint secara utuh */
+            .fixed.inset-0 {
+                position: relative !important;
+                display: block !important;
+                height: auto !important;
+                overflow: visible !important;
+                background: white !important;
+                z-index: 1 !important;
+                backdrop-filter: none !important;
+            }
+
             .print-container {
                 display: block !important;
-                position: relative !important;
                 width: 100% !important;
                 margin: 0 !important;
                 padding: 0 !important;
-                background: white !important;
-                color: black !important;
                 box-shadow: none !important;
+                border: none !important;
             }
+
+            .pdf-block {
+                break-inside: avoid;
+                page-break-inside: avoid;
+                margin-bottom: 1.5rem;
+            }
+
             .print-watermark {
                 display: block !important;
                 position: fixed;
@@ -171,21 +194,10 @@
                 transform: translate(-50%, -50%) rotate(-45deg);
                 font-size: 80pt;
                 font-weight: 900;
-                color: rgba(255, 69, 0, 0.04) !important;
+                color: rgba(255, 69, 0, 0.03) !important;
                 white-space: nowrap;
-                pointer-events: none;
                 z-index: -1;
-                text-transform: uppercase;
-                letter-spacing: 0.1em;
                 user-select: none;
-                -webkit-print-color-adjust: exact;
-            }
-            .pdf-block {
-                break-inside: avoid;
-                page-break-inside: avoid;
-                margin-bottom: 1.5rem;
-                border-bottom: 1px solid #f3f4f6;
-                padding-bottom: 1.5rem;
             }
         }
     </style>
