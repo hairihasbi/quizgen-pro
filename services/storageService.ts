@@ -83,7 +83,6 @@ export const StorageService = {
       ["deriveBits", "deriveKey"]
     );
 
-    // FIXED: Casting 'as any' pada salt untuk mengatasi ketidakcocokan tipe data di build Vercel
     const hash = await window.crypto.subtle.deriveBits(
       { name: "PBKDF2", salt: salt as any, iterations: iterations, hash: "SHA-256" },
       keyMaterial,
@@ -114,7 +113,6 @@ export const StorageService = {
         ["deriveBits", "deriveKey"]
       );
 
-      // FIXED: Casting 'as any' pada salt untuk mengatasi ketidakcocokan tipe data di build Vercel
       const derivedBits = await window.crypto.subtle.deriveBits(
         { name: "PBKDF2", salt: salt as any, iterations: iterations, hash: "SHA-256" },
         keyMaterial,
@@ -186,20 +184,28 @@ export const StorageService = {
 
   init: async () => {
     const client = StorageService.getClient();
+    
+    // Konfigurasi Default Users
+    const createDefaultUsers = async () => {
+      const adminHash = await StorageService.hashPassword('Midorima88@@');
+      const teacherHash = await StorageService.hashPassword('guru123');
+      return [
+        { id: '1', username: 'hairi', fullName: 'Admin Hairi', role: UserRole.ADMIN, credits: 999999, isActive: true, email: 'hairi@quizgen.pro', status: 'approved', password: adminHash, createdAt: new Date().toISOString() },
+        { id: '2', username: 'guru123', fullName: 'Guru Demo', role: UserRole.TEACHER, credits: 10, isActive: true, email: 'guru@sekolah.sch.id', status: 'approved', password: teacherHash, createdAt: new Date().toISOString() }
+      ];
+    };
+
     if (!client) {
       _isLocal = true;
       if (StorageService.localGet('users').length === 0) {
-        const adminHash = await StorageService.hashPassword('Midorima88@@');
-        const teacherHash = await StorageService.hashPassword('guru123');
-        StorageService.localSet('users', [
-          { id: '1', username: 'hairi', fullName: 'Admin Hairi', role: UserRole.ADMIN, credits: 999999, isActive: true, email: 'hairi@quizgen.pro', status: 'approved', password: adminHash },
-          { id: '2', username: 'guru123', fullName: 'Guru Demo', role: UserRole.TEACHER, credits: 10, isActive: true, email: 'guru@sekolah.sch.id', status: 'approved', password: teacherHash }
-        ]);
+        const defaults = await createDefaultUsers();
+        StorageService.localSet('users', defaults);
       }
       return true;
     }
 
     try {
+      // 1. Pastikan tabel ada
       await client.batch([
         `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, username TEXT, fullName TEXT, role TEXT, credits INTEGER, isActive INTEGER, email TEXT, status TEXT, password TEXT, createdAt TEXT)`,
         `CREATE TABLE IF NOT EXISTS quizzes (id TEXT PRIMARY KEY, title TEXT, subject TEXT, level TEXT, grade TEXT, topic TEXT, subTopic TEXT, difficulty TEXT, questions TEXT, grid TEXT, tags TEXT, authorId TEXT, authorName TEXT, isPublished INTEGER, createdAt TEXT, status TEXT)`,
@@ -212,9 +218,24 @@ export const StorageService = {
         `CREATE TABLE IF NOT EXISTS google_settings (id TEXT PRIMARY KEY, data TEXT)`
       ], "write");
 
+      // 2. Cek apakah tabel user kosong (Seeding Cloud)
+      const userCheck = await client.execute("SELECT COUNT(*) as count FROM users");
+      const userCount = Number(userCheck.rows[0].count);
+
+      if (userCount === 0) {
+        console.log("[STORAGE] Cloud Database is empty. Seeding initial admin users...");
+        const defaults = await createDefaultUsers();
+        const statements = defaults.map(u => ({
+          sql: "INSERT INTO users (id, username, fullName, role, credits, isActive, email, status, password, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          args: [u.id, u.username, u.fullName, u.role, u.credits, 1, u.email, u.status, u.password, u.createdAt]
+        }));
+        await client.batch(statements, "write");
+      }
+
       await StorageService.syncFull();
       return true;
     } catch (e) {
+      console.error("[STORAGE_INIT_ERROR]", e);
       _isLocal = true;
       return true;
     }
