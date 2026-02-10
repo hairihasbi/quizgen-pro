@@ -3,8 +3,8 @@ import { createClient } from '@libsql/client';
 import crypto from 'crypto';
 
 /**
- * DOKU Checkout API Handler - Signature Fix v2
- * Mengatasi 'Invalid Header Signature' dengan format strict.
+ * DOKU Checkout API Handler - Ultra Strict Signature Fix
+ * Mengatasi 'Invalid Header Signature' dengan standarisasi serialisasi body.
  */
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ message: 'Method Not Allowed' });
@@ -18,7 +18,7 @@ export default async function handler(req: any, res: any) {
   const { user, packageInfo } = req.body;
 
   try {
-    // 1. Ambil Pengaturan
+    // 1. Ambil & Bersihkan Kredensial
     const resPayment = await db.execute("SELECT data FROM payment_settings WHERE id = 'global'");
     let dbSettings = resPayment.rows.length > 0 ? JSON.parse(resPayment.rows[0].data as string) : {};
 
@@ -26,17 +26,17 @@ export default async function handler(req: any, res: any) {
     const SECRET_KEY = (process.env.DOKU_SECRET_KEY || dbSettings.secretKey || "").trim();
 
     if (!CLIENT_ID || !SECRET_KEY) {
-      return res.status(500).json({ message: 'DOKU Client ID atau Secret Key belum dikonfigurasi.' });
+      return res.status(500).json({ message: 'Konfigurasi DOKU (Client ID/Secret Key) tidak ditemukan.' });
     }
 
-    // 2. Persiapkan Variabel Identitas (Satu Sumber Kebenaran)
-    const invoiceId = `INV${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    // 2. Identitas Transaksi
+    const invoiceId = `INV${Date.now()}`;
     const requestId = crypto.randomUUID();
-    // DOKU sangat sensitif terhadap format ISO. Pastikan tanpa milidetik jika memungkinkan.
-    const timestamp = new Date().toISOString().slice(0, 19) + 'Z'; 
+    // Format: YYYY-MM-DDTHH:mm:ssZ (DOKU V1 Standar)
+    const timestamp = new Date().toISOString().split('.')[0] + 'Z';
     const targetPath = '/checkout/v1/payment';
 
-    // 3. Persiapkan Payload Body
+    // 3. Persiapkan Payload Utama
     const payload = {
       order: {
         amount: Math.floor(Number(packageInfo.amount)),
@@ -44,24 +44,26 @@ export default async function handler(req: any, res: any) {
         currency: "IDR",
         callback_url: "https://genquiz.my.id/history",
         line_items: [{
-          id: `PKG-${packageInfo.credits}`,
-          name: (packageInfo.name || 'Topup Kredit').substring(0, 50),
+          id: `PKG${packageInfo.credits}`,
+          name: String(packageInfo.name || 'Topup Kredit').substring(0, 50),
           price: Math.floor(Number(packageInfo.amount)),
           quantity: 1
         }]
       },
       customer: {
-        name: (user.fullName || user.username || 'Teacher').replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 32),
-        email: (user.email || `${user.username}@quizgen.pro`).trim()
+        name: String(user.fullName || user.username || 'User').replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 32),
+        email: String(user.email || `${user.username}@quizgen.pro`).trim()
       }
     };
 
-    // 4. Kalkulasi Digest (SHA256 dari Body, lalu Base64)
+    // PENTING: Serialisasi payload satu kali saja untuk menjamin konsistensi Hash
     const bodyString = JSON.stringify(payload);
+
+    // 4. Kalkulasi Digest (Base64 dari SHA256 Body)
     const digest = crypto.createHash('sha256').update(bodyString).digest('base64');
 
-    // 5. Konstruksi String-To-Sign (STRICT FORMAT - NO SPACES AFTER COLONS)
-    // Format: Client-Id:{ID}\nRequest-Id:{RID}\nRequest-Timestamp:{TS}\nRequest-Target:{TARGET}\nDigest:{DIGEST}
+    // 5. Konstruksi String-To-Sign (STRICT FORMAT)
+    // Pastikan TIDAK ADA spasi setelah titik dua (:) dan gunakan newline (\n)
     const stringToSign = 
       `Client-Id:${CLIENT_ID}\n` +
       `Request-Id:${requestId}\n` +
@@ -75,7 +77,7 @@ export default async function handler(req: any, res: any) {
       .update(stringToSign)
       .digest('base64');
 
-    // Simpan Transaksi ke DB sebelum hit API
+    // Simpan ke DB lokal/cloud sebagai history PENDING
     await db.execute({
       sql: "INSERT INTO transactions (id, userId, amount, credits, status, externalId, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
       args: [crypto.randomUUID(), user.id, payload.order.amount, packageInfo.credits, 'PENDING', invoiceId, new Date().toISOString()]
@@ -84,7 +86,7 @@ export default async function handler(req: any, res: any) {
     const isProd = dbSettings.mode === 'production' || process.env.NODE_ENV === 'production';
     const dokuBaseUrl = isProd ? 'https://api.doku.com' : 'https://api-sandbox.doku.com';
 
-    // 7. Kirim Request dengan Header yang Sesuai
+    // 7. Eksekusi Request ke DOKU
     const response = await fetch(`${dokuBaseUrl}${targetPath}`, {
       method: 'POST',
       headers: {
@@ -103,21 +105,21 @@ export default async function handler(req: any, res: any) {
     if (response.ok && data.response?.payment?.url) {
       return res.status(200).json(data);
     } else {
-      // Log kegagalan untuk debugging via Vercel Logs
-      console.error("[DOKU_ERROR_LOG]", {
+      console.error("[DOKU_REJECTED]", {
         status: response.status,
-        message: data.error?.message,
         requestId,
         timestamp,
-        stringToSign: stringToSign.replace(/\n/g, ' [NL] ') // Ganti newline agar mudah dibaca di log
+        errorData: data,
+        // Log ini hanya muncul di Vercel Dashboard untuk debugging internal
+        internalHint: "Pastikan Secret Key di Dashboard DOKU sama dengan di .env"
       });
       return res.status(response.status).json({
-        message: data.error?.message || "DOKU API Error: Invalid Signature atau Konfigurasi",
+        message: data.error?.message || "DOKU menolak Signature. Periksa kesesuaian Client ID/Secret Key.",
         details: data
       });
     }
   } catch (error: any) {
-    console.error("[CRITICAL_CHECKOUT_ERROR]", error);
-    return res.status(500).json({ message: `Internal Error: ${error.message}` });
+    console.error("[FATAL_CHECKOUT_ERROR]", error);
+    return res.status(500).json({ message: `Internal Server Error: ${error.message}` });
   }
 }
