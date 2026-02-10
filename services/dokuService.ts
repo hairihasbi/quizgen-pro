@@ -17,17 +17,18 @@ export const DokuService = {
       const data = await response.json();
 
       if (!response.ok) {
-        // PERBAIKAN: Ambil detail pesan error dari body response API kita
-        throw new Error(data.message || "Gagal mendapatkan akses ke DOKU.");
+        // Mengambil pesan error spesifik jika ada (misal: "Client ID Not Found")
+        const errorMessage = data.message || "Gagal mendapatkan akses ke gateway pembayaran.";
+        throw new Error(errorMessage);
       }
 
       if (data.response?.payment?.url) {
         return data.response.payment.url;
       }
       
-      throw new Error("DOKU tidak mengembalikan URL pembayaran. Periksa konfigurasi Gateway.");
+      throw new Error("DOKU tidak mengembalikan URL pembayaran. Periksa konfigurasi Merchant Dashboard Anda.");
     } catch (error: any) {
-      console.error("Doku Service Error:", error.message);
+      console.error("Doku Service Client Error:", error.message);
       throw error;
     }
   },
