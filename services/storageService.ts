@@ -89,7 +89,7 @@ export const StorageService = {
       256
     );
 
-    const saltHex = StorageService.bufferToHex(salt);
+    const saltHex = StorageService.bufferToHex(salt.buffer);
     const hashHex = StorageService.bufferToHex(hash);
     return `v1$${saltHex}$${iterations}$${hashHex}`;
   },

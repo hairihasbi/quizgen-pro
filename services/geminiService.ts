@@ -201,7 +201,7 @@ export class GeminiService {
           model: 'gemini-2.5-flash-image',
           contents: { parts: [{ text: `Professional educational diagram: ${prompt}` }] }
         });
-        const part = response.candidates[0].content.parts.find(p => p.inlineData);
+        const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
         return part?.inlineData ? `data:image/png;base64,${part.inlineData.data}` : "";
       } catch (e) { return ""; }
     });
