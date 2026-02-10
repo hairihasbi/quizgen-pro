@@ -19,7 +19,8 @@
                 processEscapes: true 
             },
             svg: { 
-                fontCache: 'none' // 'none' lebih stabil untuk snapshot PDF/canvas dibanding 'global'
+                fontCache: 'none', // WAJIB 'none' agar simbol matematika tidak hilang di PDF
+                minScale: 100
             },
             options: { 
                 enableMenu: false, 
@@ -34,7 +35,6 @@
             }
         };
 
-        // Engine untuk memantau perubahan DOM dan trigger MathJax
         window.observeMathItems = (containerId) => {
             const container = containerId ? document.getElementById(containerId) : document.body;
             if (!container) return;
@@ -53,37 +53,35 @@
         .font-zh { font-family: 'Noto Sans TC', sans-serif; }
         .orange-gradient { background: linear-gradient(135deg, #ff8c00 0%, #ff4500 100%); }
         
-        /* MathJax Styling Fixes untuk PDF */
         mjx-container { 
             display: inline-block !important; 
             vertical-align: middle !important; 
             margin: 0 0.1em !important; 
-            line-height: 0 !important;
+            line-height: normal !important;
             max-width: 100% !important;
         }
 
-        .options-grid { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 0.5rem 2rem; 
-            margin-top: 0.5rem; 
-            width: 100%;
-        }
-        
-        /* A4 Container Setup - Margin 2.2cm = 22mm */
+        /* Container A4 / F4 Setup */
+        /* Margin 2.2cm = 22mm */
         .print-container {
-            width: 210mm;
+            width: 210mm !important;
             min-height: 297mm;
-            padding: 22mm !important; /* Margin 2.2 cm Atas-Bawah-Kiri-Kanan */
+            padding: 22mm !important; 
             margin: 0 auto;
             background: white;
             box-sizing: border-box !important;
             position: relative;
-            overflow: hidden;
             color: black;
+            box-shadow: 0 0 40px rgba(0,0,0,0.1);
+            overflow: visible !important; /* Mencegah soal terpotong saat capture */
         }
 
-        /* Standarisasi Tabel agar tidak meluber */
+        /* Khusus saat proses ekspor berlangsung */
+        .exporting .print-container {
+            box-shadow: none !important;
+            margin: 0 !important;
+        }
+
         .fixed-table {
             width: 100% !important;
             table-layout: fixed !important;
@@ -92,23 +90,18 @@
         }
 
         @media print {
-            @page { 
-                size: A4 portrait; 
-                margin: 0; /* Margin dikontrol oleh padding .print-container */
-            }
+            @page { size: A4 portrait; margin: 0; }
             body { background: white !important; }
             #root > *:not(.print-modal-wrapper) { display: none !important; }
             .no-print { display: none !important; }
             
             .print-container {
                 width: 210mm !important;
-                margin: 0 !important;
                 padding: 22mm !important;
-                box-shadow: none !important;
+                margin: 0 !important;
                 border: none !important;
+                box-shadow: none !important;
                 display: block !important;
-                box-sizing: border-box !important;
-                page-break-after: always;
             }
 
             .pdf-block {
@@ -118,6 +111,10 @@
                 display: block !important;
             }
         }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #fed7aa; border-radius: 10px; }
     </style>
 <script type="importmap">
 {
