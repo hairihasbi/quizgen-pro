@@ -13,10 +13,25 @@
 
     <script>
         window.MathJax = {
-            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], processEscapes: true },
-            svg: { fontCache: 'global' },
-            options: { enableMenu: false, processHtmlClass: 'mjx-item', ignoreHtmlClass: 'tex2jax_ignore' },
-            startup: { typeset: false, ready: () => { MathJax.startup.defaultReady(); } }
+            tex: { 
+                inlineMath: [['$', '$'], ['\\(', '\\)']], 
+                displayMath: [['$$', '$$'], ['\\[', '\\]']], 
+                processEscapes: true 
+            },
+            svg: { 
+                fontCache: 'global' 
+            },
+            options: { 
+                enableMenu: false, 
+                processHtmlClass: 'mjx-item', 
+                ignoreHtmlClass: 'tex2jax_ignore' 
+            },
+            startup: { 
+                typeset: false, 
+                ready: () => { 
+                    MathJax.startup.defaultReady(); 
+                } 
+            }
         };
 
         let mathQueue = [];
@@ -57,57 +72,91 @@
         .font-zh { font-family: 'Noto Sans TC', sans-serif; }
         .orange-gradient { background: linear-gradient(135deg, #ff8c00 0%, #ff4500 100%); }
         
-        /* Fix MathJax Inline Spacing */
+        /* MathJax Styling Fixes */
         mjx-container { 
             display: inline-block !important; 
             vertical-align: middle !important; 
-            margin: 0 0.1em !important; 
-            line-height: 0 !important; 
+            margin: 0 0.15em !important; 
+            line-height: normal !important;
+            max-width: 100% !important;
+        }
+        mjx-container[display="true"] {
+            display: block !important;
+            margin: 1em auto !important;
+            text-align: center;
         }
 
-        .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 2rem; margin-top: 0.5rem; }
+        .options-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 0.75rem 2.5rem; 
+            margin-top: 0.75rem; 
+            width: 100%;
+        }
         
         /* Scrollbar Styling */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #ff8c00; border-radius: 10px; }
 
+        /* A4 Page Calibration */
+        .print-container {
+            width: 210mm;
+            min-height: 297mm;
+            padding: 15mm 20mm;
+            margin: 0 auto;
+            background: white;
+            box-sizing: border-box;
+            position: relative;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+
         /* PDF & Print Calibration */
         @media print {
-            @page { size: A4 portrait; margin: 10mm; }
+            @page { 
+                size: A4 portrait; 
+                margin: 0; 
+            }
+            body { background: white !important; }
             #root > *:not(.print-modal-wrapper) { display: none !important; }
             .no-print { display: none !important; }
             
             .print-container {
-                width: 100% !important;
-                max-width: 190mm !important; /* A4 210mm - 20mm margins */
-                margin: 0 auto !important;
-                padding: 0 !important;
+                width: 210mm !important;
+                height: auto !important;
+                margin: 0 !important;
+                padding: 15mm 20mm !important;
                 box-shadow: none !important;
                 border: none !important;
                 overflow: visible !important;
                 background: white !important;
+                box-sizing: border-box !important;
             }
 
             .pdf-block {
                 break-inside: avoid !important;
                 page-break-inside: avoid !important;
                 width: 100% !important;
+                display: block !important;
             }
 
-            table { width: 100% !important; table-layout: fixed !important; border-collapse: collapse !important; }
-            td, th { word-wrap: break-word !important; overflow-wrap: break-word !important; }
+            table { 
+                width: 100% !important; 
+                table-layout: fixed !important; 
+                border-collapse: collapse !important; 
+                word-wrap: break-word !important;
+            }
+            
+            td, th { 
+                word-wrap: break-word !important; 
+                overflow-wrap: break-word !important;
+                padding: 8px !important;
+            }
         }
 
-        /* Screen Preview Container */
-        .print-container {
-            width: 210mm;
-            min-height: 297mm;
-            padding: 20mm;
-            margin: 0 auto;
-            background: white;
-            box-sizing: border-box;
-            position: relative;
+        /* Custom scrollbar for preview */
+        .print-scroll-container {
+            scroll-behavior: smooth;
         }
     </style>
 <script type="importmap">
