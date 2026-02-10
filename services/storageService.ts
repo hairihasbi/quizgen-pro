@@ -83,7 +83,7 @@ export const StorageService = {
       ["deriveBits", "deriveKey"]
     );
 
-    // FIX: Gunakan casting 'as any' untuk menghindari error tipe data di Vercel
+    // FIXED: Casting 'as any' pada salt untuk mengatasi ketidakcocokan tipe data di build Vercel
     const hash = await window.crypto.subtle.deriveBits(
       { name: "PBKDF2", salt: salt as any, iterations: iterations, hash: "SHA-256" },
       keyMaterial,
@@ -114,7 +114,7 @@ export const StorageService = {
         ["deriveBits", "deriveKey"]
       );
 
-      // FIX: Gunakan casting 'as any' untuk menghindari error tipe data di Vercel
+      // FIXED: Casting 'as any' pada salt untuk mengatasi ketidakcocokan tipe data di build Vercel
       const derivedBits = await window.crypto.subtle.deriveBits(
         { name: "PBKDF2", salt: salt as any, iterations: iterations, hash: "SHA-256" },
         keyMaterial,
