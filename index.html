@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -143,34 +144,50 @@
         
         @media print {
             @page {
-                margin: 10mm 15mm;
-                size: auto;
+                margin: 15mm 20mm;
+                size: A4 portrait;
             }
             
-            html, body, #root {
+            /* RESET GLOBAL UNTUK PRINT */
+            html, body {
                 height: auto !important;
                 overflow: visible !important;
                 background: white !important;
                 margin: 0 !important;
                 padding: 0 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
             }
 
-            .no-print { display: none !important; }
-            
-            /* Sembunyikan semua elemen navigasi luar */
-            aside, header, nav, .main-layout-header { display: none !important; }
+            /* SEMBUNYIKAN SEMUA UI WEB */
+            #root > *:not(.print-modal-wrapper) { display: none !important; }
+            aside, header, nav, footer, .no-print, .main-layout-header { display: none !important; }
 
-            /* Paksa modal untuk tidak menjadi 'fixed' agar bisa diprint secara utuh */
-            .fixed.inset-0 {
-                position: relative !important;
-                display: block !important;
+            /* ATUR ULANG WRAPPER MODAL UNTUK PRINT */
+            .print-modal-wrapper {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
                 height: auto !important;
                 overflow: visible !important;
+                display: block !important;
+                padding: 0 !important;
                 background: white !important;
-                z-index: 1 !important;
+                z-index: 9999 !important;
                 backdrop-filter: none !important;
             }
 
+            /* Pastikan kontainer scrollable melepaskan overflow-nya */
+            .print-scroll-container {
+                overflow: visible !important;
+                height: auto !important;
+                display: block !important;
+                padding: 0 !important;
+                background: transparent !important;
+            }
+
+            /* AREA KERTAS SOAL */
             .print-container {
                 display: block !important;
                 width: 100% !important;
@@ -178,12 +195,16 @@
                 padding: 0 !important;
                 box-shadow: none !important;
                 border: none !important;
+                min-height: 0 !important;
+                color: black !important;
             }
 
+            /* PECAHAN HALAMAN YANG BERSIH */
             .pdf-block {
                 break-inside: avoid;
                 page-break-inside: avoid;
-                margin-bottom: 1.5rem;
+                margin-bottom: 2rem;
+                display: block !important;
             }
 
             .print-watermark {
@@ -194,10 +215,10 @@
                 transform: translate(-50%, -50%) rotate(-45deg);
                 font-size: 80pt;
                 font-weight: 900;
-                color: rgba(255, 69, 0, 0.03) !important;
+                color: rgba(0, 0, 0, 0.03) !important;
                 white-space: nowrap;
                 z-index: -1;
-                user-select: none;
+                pointer-events: none;
             }
         }
     </style>
