@@ -12,8 +12,6 @@ interface QuizViewerProps {
 const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
   const [showAnswer, setShowAnswer] = useState(false);
   const [exportMode, setExportMode] = useState<'soal' | 'kisi-kisi' | 'lengkap'>('soal');
-  const [isExporting, setIsExporting] = useState(false);
-  const [isExportingDocs, setIsExportingDocs] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
@@ -51,36 +49,36 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
     return levelStr;
   };
 
-  const handleNativePrint = async () => {
-    if ((window as any).MathJax && (window as any).MathJax.typesetPromise) {
-        await (window as any).MathJax.typesetPromise([document.getElementById('quiz-print-area')]);
-    }
-    setTimeout(() => {
-      window.print();
-    }, 800);
-  };
-
   const handleDownloadPdf = async () => {
     const element = document.getElementById('quiz-print-area');
+    const scrollContainer = document.querySelector('.print-scroll-container');
     if (!element) return;
 
     setIsDownloading(true);
 
     try {
-      // 1. Sinkronisasi paksa MathJax sebelum snapshot
+      // 1. Persiapan Lingkungan Capture
+      document.body.classList.add('exporting');
+      if (scrollContainer) scrollContainer.scrollTop = 0;
+
+      // 2. Sinkronisasi Paksa MathJax
       if ((window as any).MathJax && (window as any).MathJax.typesetPromise) {
         await (window as any).MathJax.typesetPromise([element]);
       }
 
-      // 2. Tunggu browser selesai melakukan 'Paint' SVG
-      // Menggunakan delay 2 detik untuk memastikan tidak blank
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // 3. JEDA KRUSIAL (2.5 Detik)
+      // Memberikan waktu bagi browser untuk menggambar SVG ke memory canvas
+      await new Promise(resolve => {
+        requestAnimationFrame(() => {
+          setTimeout(resolve, 2500); 
+        });
+      });
 
-      // 3. Konfigurasi Standar Industri A4
+      // 4. Konfigurasi Presisi
       const opt = {
-        margin: 0, // Kita sudah pakai padding 22mm di CSS kontainer
+        margin: 0, // Padding 22mm sudah ada di CSS .print-container
         filename: `Quiz_${quiz.title.replace(/\s+/g, '_')}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
+        image: { type: 'jpeg', quality: 1.0 },
         html2canvas: { 
           scale: 2, 
           useCORS: true, 
@@ -88,33 +86,26 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
           letterRendering: true,
           scrollY: 0,
           scrollX: 0,
-          windowWidth: element.clientWidth, // Memastikan canvas menangkap lebar kontainer yang benar
+          windowWidth: 794, // Lebar ekuivalen 210mm (A4/F4)
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'], avoid: ['.pdf-block', 'tr', 'h1', 'h2', 'h3', '.identitas-box'] }
+        pagebreak: { mode: ['css', 'legacy'], avoid: ['.pdf-block', 'tr', '.identitas-box'] }
       };
 
-      // 4. Eksekusi proses unduh
+      // 5. Eksekusi Capture
       const worker = (window as any).html2pdf().from(element).set(opt);
       await worker.save();
     } catch (err) {
-      console.error("PDF Error:", err);
-      alert("Gagal mengunduh PDF. Pastikan seluruh konten sudah muncul di layar.");
+      console.error("Ekspor PDF Gagal:", err);
+      alert("Terjadi kendala saat membuat PDF. Pastikan seluruh soal sudah tampil di layar.");
     } finally {
+      document.body.classList.remove('exporting');
       setIsDownloading(false);
     }
   };
 
-  const handleExportToGoogleForms = async () => {
-    setIsExporting(true);
-    try {
-      const formUrl = await GoogleFormsService.exportToForms(quiz);
-      window.open(formUrl, '_blank');
-    } catch (err: any) {
-      alert("Gagal ekspor: " + err.message);
-    } finally {
-      setIsExporting(false);
-    }
+  const handleNativePrint = () => {
+    window.print();
   };
 
   return (
@@ -125,7 +116,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
           <div className="w-12 h-12 orange-gradient rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg">📄</div>
           <div>
             <h2 className="font-black text-gray-800 uppercase text-[10px] tracking-tight truncate max-w-[220px]">{quiz.title}</h2>
-            <div className="text-[8px] font-bold text-orange-500 uppercase mt-1">Preview: {exportMode}</div>
+            <div className="text-[8px] font-bold text-orange-500 uppercase mt-1">Mode: {exportMode}</div>
           </div>
         </div>
         
@@ -146,7 +137,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
       </header>
 
       <div className="flex-1 overflow-y-auto p-0 md:p-10 flex justify-center custom-scrollbar print-scroll-container">
-        <div id="quiz-print-area" className="print-container bg-white shadow-2xl text-gray-900 w-[210mm] min-h-screen box-border overflow-hidden">
+        <div id="quiz-print-area" className="print-container bg-white text-gray-900">
           
           {/* HEADER / KOP SOAL */}
           <div className="border-b-[4px] border-double border-gray-900 pb-3 mb-6 text-center w-full box-border">
@@ -156,7 +147,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
              </div>
           </div>
 
-          {/* DATA SISWA - Layout Fixed Table agar tidak meluber keluar margin 2.2cm */}
+          {/* DATA SISWA */}
           <div className="identitas-box mb-8 w-full box-border">
             <table className="fixed-table border-[3px] border-gray-900 rounded-xl overflow-hidden">
               <tbody>
@@ -197,7 +188,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
           </div>
 
           {/* AREA KONTEN */}
-          <div className="w-full box-border overflow-visible">
+          <div className="w-full box-border">
             {(exportMode === 'soal' || exportMode === 'lengkap') && (
               <div className="space-y-0">
                 {quiz.questions.map((q, i) => {
@@ -244,9 +235,9 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
               </div>
             )}
 
-            {/* TABEL KISI-KISI - Fixed Width dengan Persentase untuk mencegah Overflow */}
+            {/* TABEL KISI-KISI */}
             {exportMode === 'kisi-kisi' && (
-              <div className="mt-8 w-full box-border overflow-hidden">
+              <div className="mt-8 w-full box-border overflow-visible">
                 <h3 className="text-lg font-black text-gray-900 uppercase border-b-2 border-gray-900 mb-6 pb-2 text-center">Kisi-kisi Instrumen Penilaian</h3>
                 <table className="fixed-table border-[2.5px] border-gray-900 text-[9px]">
                   <thead>
