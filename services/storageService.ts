@@ -10,7 +10,6 @@ const JWT_SECRET = 'qzgen_secure_2024_#!_supersecret';
 
 export const StorageService = {
   isLocal: () => _isLocal,
-  // ... (metode utilitas hashing & b64 tetap sama)
   base64UrlEncode: (str: string): string => btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, ''),
   base64UrlDecode: (str: string): string => {
     str = str.replace(/-/g, '+').replace(/_/g, '/');
@@ -261,7 +260,8 @@ export const StorageService = {
   },
   getPaymentSettings: async (): Promise<PaymentSettings> => {
     const local = localStorage.getItem('quizgen_payment_settings');
-    return local ? JSON.parse(local) : { mode: 'sandbox', clientId: '', secretKey: '', merchantName: 'GenZ QuizGen Store', callbackUrl: '', packages: [ { id: '1', name: 'Lite Pack', credits: 30, price: 30000, isActive: true }, { id: '2', name: 'Standard Pro', credits: 50, price: 50000, isActive: true }, { id: '3', name: 'Premium Guru', credits: 100, price: 100000, isActive: true } ] };
+    // Force default mode to production
+    return local ? { ...JSON.parse(local), mode: 'production' } : { mode: 'production', clientId: '', secretKey: '', merchantName: 'GenZ QuizGen Store', callbackUrl: '', packages: [ { id: '1', name: 'Lite Pack', credits: 30, price: 30000, isActive: true }, { id: '2', name: 'Standard Pro', credits: 50, price: 50000, isActive: true }, { id: '3', name: 'Premium Guru', credits: 100, price: 100000, isActive: true } ] };
   },
   savePaymentSettings: async (settings: PaymentSettings) => { localStorage.setItem('quizgen_payment_settings', JSON.stringify(settings)); const client = StorageService.getClient(); if (client && !_isLocal) { try { await client.execute({ sql: "INSERT OR REPLACE INTO payment_settings (id, data) VALUES ('global', ?)", args: [JSON.stringify(settings)] }); } catch(e){} } },
   addLog: async (log: QuizLog) => {
