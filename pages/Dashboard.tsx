@@ -90,6 +90,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     }
   };
 
+  const handleDeleteTransaction = async (id: string, externalId: string) => {
+    if (!window.confirm(`Hapus catatan transaksi ${externalId} dari riwayat?`)) return;
+    try {
+      await StorageService.deleteTransaction(id);
+      setTransactions(prev => prev.filter(t => t.id !== id));
+    } catch (e) {
+      alert("Gagal menghapus transaksi.");
+    }
+  };
+
   const lastCron = logs.find(l => l.action === 'SYSTEM_CRON');
   const unreadCount = inbox.filter(n => !n.isRead).length;
 
@@ -233,7 +243,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           </div>
           <div className="flex-1 divide-y divide-gray-50 overflow-y-auto max-h-[400px]">
             {transactions.map((trx, i) => (
-              <div key={i} className="p-8 flex items-center justify-between hover:bg-orange-50/10 transition-all">
+              <div key={trx.id} className="p-8 flex items-center justify-between hover:bg-orange-50/10 transition-all group">
                 <div className="flex items-center gap-5">
                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl ${
                      trx.status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-500' : trx.status === 'PENDING' ? 'bg-amber-50 text-amber-500' : 'bg-rose-50 text-rose-500'
@@ -245,16 +255,28 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                       <div className="text-[10px] text-gray-400 font-bold uppercase">{new Date(trx.createdAt).toLocaleDateString()}</div>
                    </div>
                 </div>
-                <div className="text-right">
-                   <div className="font-black text-gray-900 text-lg">Rp {trx.amount.toLocaleString()}</div>
-                   <div className={`text-[9px] font-black uppercase px-3 py-1 rounded-lg inline-block mt-1 ${
-                     trx.status === 'SUCCESS' ? 'bg-emerald-500 text-white' : 'bg-amber-100 text-amber-600'
-                   }`}>
-                     {trx.status}
+                <div className="flex items-center gap-6">
+                   <div className="text-right">
+                      <div className="font-black text-gray-900 text-lg">Rp {trx.amount.toLocaleString()}</div>
+                      <div className={`text-[9px] font-black uppercase px-3 py-1 rounded-lg inline-block mt-1 ${
+                        trx.status === 'SUCCESS' ? 'bg-emerald-500 text-white' : 'bg-amber-100 text-amber-600'
+                      }`}>
+                        {trx.status}
+                      </div>
                    </div>
+                   <button 
+                     onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(trx.id, trx.externalId); }}
+                     className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all opacity-0 group-hover:opacity-100"
+                     title="Hapus riwayat"
+                   >
+                     🗑️
+                   </button>
                 </div>
               </div>
             ))}
+            {transactions.length === 0 && (
+              <div className="py-20 text-center text-gray-300 font-bold uppercase text-[9px] tracking-widest">Belum Ada Transaksi</div>
+            )}
           </div>
         </div>
       </div>
