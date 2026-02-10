@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Quiz } from '../types';
 import { GoogleFormsService } from '../services/googleFormsService';
@@ -88,9 +89,9 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-orange-50/95 backdrop-blur-2xl z-[500] flex flex-col p-4 md:p-8 animate-in zoom-in-95 duration-300 print:relative print:p-0 print:bg-white print:block print:h-auto" role="dialog" aria-labelledby="viewer-quiz-title">
+    <div className="fixed inset-0 bg-orange-50/95 backdrop-blur-2xl z-[500] flex flex-col p-4 md:p-8 animate-in zoom-in-95 duration-300 print-modal-wrapper" role="dialog" aria-labelledby="viewer-quiz-title">
       
-      {/* Header kontrol aplikasi (disembunyikan saat print) */}
+      {/* Header kontrol (disembunyikan saat print via CSS .no-print) */}
       <header className="flex flex-col lg:flex-row justify-between items-center bg-white p-5 rounded-[2.5rem] shadow-xl shadow-orange-100/50 mb-6 border border-orange-100 gap-4 no-print text-gray-900">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 orange-gradient rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg" aria-hidden="true">📄</div>
@@ -146,14 +147,14 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
         </div>
       </header>
 
-      {/* Area Soal (Scrollable di web, auto-height di print) */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-10 flex justify-center custom-scrollbar bg-orange-100/20 rounded-[3rem] print:bg-white print:p-0 print:overflow-visible print:block print:h-auto">
-        <div id="quiz-print-area" className="print-container bg-white shadow-2xl transition-all duration-500 text-gray-900 w-full md:w-[210mm] min-h-screen py-[15mm] print:shadow-none print:w-full print:py-0 print:min-h-0">
+      {/* Area View yang menjadi Scrollable di Web namun Static di Print */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-10 flex justify-center custom-scrollbar bg-orange-100/20 rounded-[3rem] print-scroll-container">
+        <div id="quiz-print-area" className="print-container bg-white shadow-2xl transition-all duration-500 text-gray-900 w-full md:w-[210mm] min-h-screen py-[15mm]">
           
           <div className="print-watermark">GENZ QUIZGEN PRO</div>
 
-          {/* Kop Soal & Identitas Siswa (Hanya ini yang tampil sebagai header di print) */}
-          <div className="pdf-block px-[20mm] mb-6 print:px-0">
+          {/* KOP SOAL */}
+          <div className="pdf-block px-[20mm]">
              <div className="border-b-4 border-double border-gray-900 pb-4 mb-6 text-center">
                 <h1 className="text-2xl font-black uppercase tracking-tight text-gray-900">{quiz.title}</h1>
                 <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-gray-600 mt-1">
@@ -185,7 +186,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
              </div>
           </div>
 
-          <div className="px-[20mm] print:px-0">
+          <div className="px-[20mm]">
             {(exportMode === 'soal' || exportMode === 'lengkap') && (
               <div className="space-y-0">
                 {quiz.questions.map((q, i) => {
