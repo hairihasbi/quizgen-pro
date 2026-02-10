@@ -68,35 +68,36 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
     setIsDownloading(true);
 
     try {
-      // 1. Reset Scroll agar snapshot stabil
+      // 1. Pastikan area render terlihat sepenuhnya di viewport untuk snapshot yang stabil
       if (scrollContainer) scrollContainer.scrollTop = 0;
 
-      // 2. Sinkronisasi paksa MathJax dengan area spesifik
+      // 2. Sinkronisasi paksa MathJax dengan Typeset Promise
       if ((window as any).MathJax && (window as any).MathJax.typesetPromise) {
         await (window as any).MathJax.typesetPromise([element]);
       }
 
-      // 3. AGGRESSIVE SYNC: Menunggu browser melakukan 'Repaint' penuh pada formula SVG
-      // Kita gunakan loop requestAnimationFrame untuk menjamin siklus render browser selesai
+      // 3. Delay tambahan untuk sinkronisasi paint browser (Chrome/Edge rendering lag)
+      // Menggunakan double requestAnimationFrame + setTimeout untuk kepastian render formula
       await new Promise(resolve => {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            setTimeout(resolve, 2000); // Memberikan 2 detik untuk formula kompleks
+            setTimeout(resolve, 1500); // 1.5 detik delay untuk rendering formula kompleks
           });
         });
       });
 
-      // 4. Konfigurasi Presisi A4 dengan Margin Internal 2.2cm
+      // 4. Konfigurasi Presisi A4 untuk html2pdf
       const opt = {
-        margin: 0, // Margin PDF nol karena kita pakai padding CSS 22mm di elemen
+        margin: [10, 10, 10, 10], // Margin 10mm di PDF
         filename: `Quiz_${quiz.title.replace(/\s+/g, '_')}.pdf`,
-        image: { type: 'jpeg', quality: 1.0 },
+        image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { 
-          scale: 2.5, // Meningkatkan DPI agar formula tajam
+          scale: 2, 
           useCORS: true, 
           logging: false,
           letterRendering: true,
-          windowWidth: 794, // Kunci lebar window di standar pixel A4 96dpi
+          // Lebar window disesuaikan agar aspek rasio A4 (210mm) konsisten
+          windowWidth: 794, 
           scrollY: 0,
           scrollX: 0
         },
@@ -104,12 +105,12 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
         pagebreak: { mode: ['css', 'legacy'], avoid: ['.pdf-block', 'tr', 'h1', 'h2', 'h3', '.identitas-box'] }
       };
 
-      // 5. Eksekusi Save
+      // 5. Eksekusi Download
       const worker = (window as any).html2pdf().from(element).set(opt);
       await worker.save();
     } catch (err) {
       console.error("PDF Download Error:", err);
-      alert("Gagal mengunduh PDF. Pastikan seluruh formula matematika muncul dengan benar di layar sebelum mengklik unduh.");
+      alert("Gagal mengunduh PDF. Pastikan koneksi stabil dan formula matematika sudah ter-render.");
     } finally {
       setIsDownloading(false);
     }
@@ -170,8 +171,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
       </header>
 
       <div className="flex-1 overflow-y-auto p-0 md:p-10 flex justify-center custom-scrollbar print-scroll-container">
-        {/* Kontainer Utama dengan Lebar A4 Standar & Padding 2.2cm */}
-        <div id="quiz-print-area" className="print-container bg-white shadow-2xl text-gray-900 w-[210mm] min-h-screen box-border overflow-hidden">
+        <div id="quiz-print-area" className="print-container bg-white shadow-2xl text-gray-900 w-[210mm] min-h-screen py-[15mm] px-[20mm] box-border print:py-0 print:px-0">
           
           {/* HEADER / KOP SOAL */}
           <div className="border-b-[4px] border-double border-gray-900 pb-3 mb-6 text-center w-full box-border">
@@ -181,8 +181,8 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
              </div>
           </div>
 
-          {/* DATA SISWA - Menggunakan width 100% dan box-sizing border-box agar tidak meluber */}
-          <div className="identitas-box grid grid-cols-2 gap-x-8 gap-y-4 p-5 border-[3px] border-gray-900 rounded-xl mb-8 w-full box-border">
+          {/* DATA SISWA - Menggunakan width 100% dan box-sizing border-box agar tidak terpotong margin kanan */}
+          <div className="identitas-box grid grid-cols-2 gap-x-8 gap-y-4 p-5 border-[3px] border-gray-900 rounded-xl mb-8 w-full box-border mx-auto">
              <div className="flex items-center gap-3">
                 <span className="w-16 shrink-0 font-black text-[10px] text-gray-600 uppercase">NAMA</span>
                 <span className="font-black text-gray-900">:</span>
@@ -206,7 +206,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
           </div>
 
           {/* AREA KONTEN */}
-          <div className="w-full box-border">
+          <div className="w-full box-border overflow-visible">
             {(exportMode === 'soal' || exportMode === 'lengkap') && (
               <div className="space-y-0">
                 {quiz.questions.map((q, i) => {
@@ -230,9 +230,9 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                           <div className="flex-1 min-w-0">
                             <div className={`mjx-item text-gray-900 font-bold leading-relaxed text-[13px] text-justify pb-2 w-full break-words ${getFontClass(quiz.subject)}`} dangerouslySetInnerHTML={{ __html: sanitizeHTML(q.text) }}></div>
                             {q.options && (
-                              <div className="options-grid w-full box-border">
+                              <div className="options-grid w-full">
                                 {q.options.map(opt => (
-                                  <div key={opt.label} className="flex gap-2 items-start w-full overflow-hidden box-border">
+                                  <div key={opt.label} className="flex gap-2 items-start w-full overflow-hidden">
                                     <span className="font-black text-gray-900 w-6 h-6 flex items-center justify-center rounded-lg border border-gray-400 text-[10px] shrink-0">{opt.label}</span>
                                     <div className={`mjx-item font-semibold text-gray-800 text-[12px] pt-0.5 flex-1 min-w-0 ${getFontClass(quiz.subject)}`} dangerouslySetInnerHTML={{ __html: sanitizeHTML(opt.text) }}></div>
                                   </div>
@@ -253,19 +253,19 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
               </div>
             )}
 
-            {/* TABEL KISI-KISI - Diperbaiki dengan table-fixed dan lebar kolom persentase presisi */}
+            {/* TABEL KISI-KISI - Diperbaiki lebarnya agar tidak terpotong (table-fixed dengan px lebar kolom yang aman) */}
             {exportMode === 'kisi-kisi' && (
-              <div className="mt-8 w-full box-border overflow-hidden">
+              <div className="mt-8 w-full box-border overflow-visible">
                 <h3 className="text-lg font-black text-gray-900 uppercase border-b-2 border-gray-900 mb-6 pb-2 text-center">Kisi-kisi Instrumen Penilaian</h3>
-                <table className="w-full border-collapse border-[2.5px] border-gray-900 text-[9px] table-fixed box-border">
+                <table className="w-full border-collapse border-[2.5px] border-gray-900 text-[9px] table-fixed">
                   <thead>
                     <tr className="bg-gray-100 print:bg-gray-50">
-                      <th className="border-2 border-gray-900 p-1 w-[8%] text-center font-black uppercase">No</th>
-                      <th className="border-2 border-gray-900 p-1 text-center w-[22%] font-black uppercase">KD / TP</th>
-                      <th className="border-2 border-gray-900 p-1 text-center w-[18%] font-black uppercase">Materi</th>
-                      <th className="border-2 border-gray-900 p-1 text-center w-[28%] font-black uppercase">Indikator</th>
-                      <th className="border-2 border-gray-900 p-1 w-[10%] text-center font-black uppercase">Level</th>
-                      <th className="border-2 border-gray-900 p-1 w-[14%] text-center font-black uppercase">Bentuk</th>
+                      <th className="border-2 border-gray-900 p-1 w-[35px] text-center font-black uppercase">No</th>
+                      <th className="border-2 border-gray-900 p-1 text-center w-[110px] font-black uppercase">KD / TP</th>
+                      <th className="border-2 border-gray-900 p-1 text-center w-[90px] font-black uppercase">Materi</th>
+                      <th className="border-2 border-gray-900 p-1 text-center font-black uppercase">Indikator</th>
+                      <th className="border-2 border-gray-900 p-1 w-[45px] text-center font-black uppercase">Level</th>
+                      <th className="border-2 border-gray-900 p-1 w-[65px] text-center font-black uppercase">Bentuk</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -274,7 +274,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                         <td className="border-2 border-gray-900 p-2 text-center font-bold">{i + 1}</td>
                         <td className="border-2 border-gray-900 p-2 text-justify leading-tight">{q.competency || "-"}</td>
                         <td className="border-2 border-gray-900 p-2 text-center leading-tight">{q.topic || "-"}</td>
-                        <td className="border-2 border-gray-900 p-2 text-justify leading-relaxed break-words">
+                        <td className="border-2 border-gray-900 p-2 text-justify leading-relaxed break-words overflow-visible">
                           <div className="mjx-item">{q.indicator}</div>
                         </td>
                         <td className="border-2 border-gray-900 p-2 text-center whitespace-nowrap">{getCognitiveLevelMapping(q.cognitiveLevel)}</td>
