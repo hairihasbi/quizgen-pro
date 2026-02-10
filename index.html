@@ -8,40 +8,25 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Amiri&family=Noto+Sans+JP&family=Noto+Serif+KR&family=Noto+Sans+TC&display=swap" rel="stylesheet">
     
+    <!-- Library untuk Save PDF Langsung -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
     <script>
-        // Global Batching Queue for MathJax
         window.MathJax = {
-            tex: {
-                inlineMath: [['$', '$'], ['\\(', '\\)']],
-                displayMath: [['$$', '$$'], ['\\[', '\\]']],
-                processEscapes: true
-            },
-            svg: {
-                fontCache: 'global'
-            },
-            options: {
-                enableMenu: false,
-                processHtmlClass: 'mjx-item', 
-                ignoreHtmlClass: 'tex2jax_ignore'
-            },
-            startup: {
-                typeset: false,
-                ready: () => {
-                    MathJax.startup.defaultReady();
-                }
-            }
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], processEscapes: true },
+            svg: { fontCache: 'global' },
+            options: { enableMenu: false, processHtmlClass: 'mjx-item', ignoreHtmlClass: 'tex2jax_ignore' },
+            startup: { typeset: false, ready: () => { MathJax.startup.defaultReady(); } }
         };
 
         let mathQueue = [];
         let mathTimeout = null;
-
         const processMathQueue = () => {
             if (mathQueue.length === 0) return;
             const targets = [...mathQueue];
             mathQueue = [];
             if (window.MathJax && window.MathJax.typesetPromise) {
-                window.MathJax.typesetPromise(targets)
-                .catch(err => console.error('MathJax Batch Error:', err));
+                window.MathJax.typesetPromise(targets).catch(err => console.error(err));
             }
         };
 
@@ -72,20 +57,8 @@
         .font-zh { font-family: 'Noto Sans TC', sans-serif; }
         .orange-gradient { background: linear-gradient(135deg, #ff8c00 0%, #ff4500 100%); }
         
-        mjx-container {
-            display: inline-block !important;
-            vertical-align: middle !important;
-            margin: 0 0.15em !important;
-            line-height: 0 !important;
-        }
-        
-        .options-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem 3rem;
-            margin-top: 1rem;
-        }
-
+        mjx-container { display: inline-block !important; vertical-align: middle !important; margin: 0 0.15em !important; line-height: 0 !important; }
+        .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 3rem; margin-top: 1rem; }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #ff8c00; border-radius: 10px; }
@@ -93,10 +66,9 @@
         @media print {
             @page {
                 size: A4 portrait;
-                margin: 15mm; /* Margin standar A4 */
+                margin: 0;
             }
             
-            /* Sembunyikan semua elemen kecuali modal yang sedang aktif */
             #root > *:not(.print-modal-wrapper) {
                 display: none !important;
             }
@@ -111,16 +83,15 @@
             }
 
             .print-modal-wrapper {
-                position: absolute !important;
-                top: 0 !important;
-                left: 0 !important;
+                position: static !important;
+                display: block !important;
                 width: 100% !important;
                 height: auto !important;
                 padding: 0 !important;
                 margin: 0 !important;
-                display: block !important;
                 background: white !important;
-                z-index: 9999 !important;
+                box-shadow: none !important;
+                overflow: visible !important;
             }
 
             .no-print {
@@ -136,24 +107,24 @@
             }
 
             .print-container {
-                width: 100% !important;
-                max-width: 100% !important;
+                width: 210mm !important;
+                max-width: 210mm !important;
                 margin: 0 !important;
-                padding: 0 !important;
+                padding: 15mm !important;
                 border: none !important;
                 box-shadow: none !important;
                 display: block !important;
+                position: relative !important;
+                left: 0 !important;
             }
 
-            /* Hindari soal terpotong di tengah halaman */
             .pdf-block {
                 break-inside: avoid;
                 page-break-inside: avoid;
-                margin-bottom: 2rem;
+                margin-bottom: 1.5rem;
                 padding: 0 !important;
             }
 
-            /* Pastikan teks hitam pekat untuk hasil cetak terbaik */
             .print-container * {
                 color: black !important;
                 text-shadow: none !important;
