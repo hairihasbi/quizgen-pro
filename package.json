@@ -17,7 +17,9 @@
     "@libsql/client": "^0.17.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "lucide-react": "^0.460.0"
+    "lucide-react": "^0.460.0",
+    "puppeteer-core": "^22.6.0",
+    "@sparticuz/chromium": "^123.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
