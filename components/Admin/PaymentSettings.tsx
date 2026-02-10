@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StorageService } from '../../services/storageService';
 import { PaymentSettings, PaymentPackage } from '../../types';
 
@@ -34,14 +34,17 @@ const PaymentSettingsPanel: React.FC = () => {
 
   const loadSettings = async () => {
     const data = await StorageService.getPaymentSettings();
-    setSettings(data);
+    // Force mode to production when loading
+    setSettings({ ...data, mode: 'production' });
     setLoading(false);
   };
 
   const handleSave = async () => {
     if (!settings) return;
-    await StorageService.savePaymentSettings(settings);
-    alert('Konfigurasi Pembayaran & Paket Berhasil Disimpan di Cloud!');
+    // Always ensure mode is production before saving
+    const finalSettings = { ...settings, mode: 'production' as const };
+    await StorageService.savePaymentSettings(finalSettings);
+    alert('Konfigurasi Pembayaran Production Berhasil Disimpan!');
     loadSettings(); 
   };
 
@@ -73,7 +76,7 @@ const PaymentSettingsPanel: React.FC = () => {
 
   if (loading || !settings) return (
     <div className="p-20 text-center text-orange-500 font-black animate-pulse uppercase tracking-[0.2em]">
-      Memuat Konfigurasi Gateway...
+      Menyinkronkan Kredensial Gateway...
     </div>
   );
 
@@ -85,49 +88,30 @@ const PaymentSettingsPanel: React.FC = () => {
       <div className="bg-white rounded-[3rem] border shadow-sm p-10 space-y-10">
         <header className="flex flex-col md:flex-row justify-between items-center border-b pb-8 gap-6">
            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-3xl shadow-inner">💳</div>
+              <div className="w-14 h-14 orange-gradient rounded-2xl flex items-center justify-center text-white text-3xl shadow-xl">🛡️</div>
               <div>
                  <div className="flex items-center gap-2">
-                    <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">DOKU Payment Gateway</h2>
-                    {anyEnvManaged && (
-                      <span className="bg-amber-100 text-amber-600 text-[8px] font-black px-3 py-1 rounded-full uppercase flex items-center gap-1 shadow-sm border border-amber-200">
-                        🛡️ ENV MANAGED
-                      </span>
-                    )}
+                    <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">DOKU Payment Production</h2>
+                    <span className="bg-emerald-100 text-emerald-600 text-[8px] font-black px-3 py-1 rounded-full uppercase flex items-center gap-1 shadow-sm border border-emerald-200">
+                      LIVE MODE
+                    </span>
                  </div>
-                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Status: {settings.mode === 'sandbox' ? 'Development / Sandbox' : 'Live / Production'}</p>
+                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Status: Ready for Real Transactions</p>
               </div>
            </div>
            <button onClick={handleSave} className="px-10 py-4 orange-gradient text-white font-black rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition-all uppercase text-xs tracking-widest">
-             Simpan Gateway & Paket
+             Simpan Kredensial
            </button>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
            <div className="space-y-6">
-              <h3 className="text-xs font-black text-orange-500 uppercase tracking-[0.2em] border-l-4 border-orange-500 pl-4">API Credentials</h3>
+              <h3 className="text-xs font-black text-orange-500 uppercase tracking-[0.2em] border-l-4 border-orange-500 pl-4">Production Credentials</h3>
               <div className="space-y-4">
                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Gateway Mode</label>
-                    <div className="flex p-1 bg-gray-100 rounded-2xl">
-                       <button 
-                         onClick={() => setSettings({...settings, mode: 'sandbox'})}
-                         className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${settings.mode === 'sandbox' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'}`}
-                       >
-                         Sandbox
-                       </button>
-                       <button 
-                         onClick={() => setSettings({...settings, mode: 'production'})}
-                         className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${settings.mode === 'production' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400'}`}
-                       >
-                         Production
-                       </button>
-                    </div>
-                 </div>
-                 <div className="space-y-1">
                     <div className="flex justify-between items-center ml-2">
-                       <label className="text-[10px] font-black text-gray-400 uppercase">Client ID</label>
-                       {envStatus.clientIdManaged && <span className="text-[8px] font-black text-amber-500 uppercase">Managed by Env</span>}
+                       <label className="text-[10px] font-black text-gray-400 uppercase">Production Client ID</label>
+                       {envStatus.clientIdManaged && <span className="text-[8px] font-black text-amber-500 uppercase">Vercel Managed</span>}
                     </div>
                     <input 
                       type="text" 
@@ -137,13 +121,13 @@ const PaymentSettingsPanel: React.FC = () => {
                       }`} 
                       value={envStatus.clientIdManaged ? 'managed_by_environment_variable' : settings.clientId}
                       onChange={e => setSettings({...settings, clientId: e.target.value})}
-                      placeholder="Masukkan DOKU Client ID"
+                      placeholder="Input ID Production"
                     />
                  </div>
                  <div className="space-y-1">
                     <div className="flex justify-between items-center ml-2">
-                       <label className="text-[10px] font-black text-gray-400 uppercase">Secret Key</label>
-                       {envStatus.secretKeyManaged && <span className="text-[8px] font-black text-amber-500 uppercase">Managed by Env</span>}
+                       <label className="text-[10px] font-black text-gray-400 uppercase">Production Secret Key</label>
+                       {envStatus.secretKeyManaged && <span className="text-[8px] font-black text-amber-500 uppercase">Vercel Managed</span>}
                     </div>
                     <div className="relative">
                       <input 
@@ -155,7 +139,7 @@ const PaymentSettingsPanel: React.FC = () => {
                         }`}
                         value={envStatus.secretKeyManaged ? 'managed_by_environment_variable' : settings.secretKey}
                         onChange={e => setSettings({...settings, secretKey: e.target.value})}
-                        placeholder="Masukkan DOKU Secret Key"
+                        placeholder="Input Key Production"
                       />
                       {!envStatus.secretKeyManaged && (
                         <button 
@@ -167,32 +151,24 @@ const PaymentSettingsPanel: React.FC = () => {
                       )}
                     </div>
                     <p className="text-[8px] text-gray-400 font-bold uppercase mt-2 px-2 leading-relaxed">
-                      {envStatus.secretKeyManaged 
-                        ? "✓ Sistem mendeteksi DOKU_SECRET_KEY di Vercel/Server. Pengaturan manual dinonaktifkan."
-                        : settings.secretKey.includes('VAULT') 
-                        ? "✓ Kunci tersimpan aman di Cloud Vault. Masukkan teks baru untuk menimpa." 
-                        : "Sangat disarankan mengatur ini via Vercel Dashboard demi keamanan maksimal."}
+                      Layanan Sandbox telah dinonaktifkan. Pastikan kredensial di atas diambil dari tab <strong>Production</strong> di Dashboard DOKU Anda.
                     </p>
                  </div>
               </div>
            </div>
 
            <div className="space-y-6">
-              <h3 className="text-xs font-black text-orange-500 uppercase tracking-[0.2em] border-l-4 border-orange-500 pl-4">Integrasi Webhook</h3>
+              <h3 className="text-xs font-black text-orange-500 uppercase tracking-[0.2em] border-l-4 border-orange-500 pl-4">Notification Gateway</h3>
               <div className="p-8 bg-gray-900 rounded-[2.5rem] border border-gray-800 text-white space-y-6">
                  <div className="flex items-center gap-4 border-b border-white/10 pb-4">
-                    <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-xl">🔗</div>
-                    <div className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Notification URL</div>
+                    <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-xl">🚀</div>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Live Webhook URL</div>
                  </div>
                  <div className="space-y-2">
-                    <p className="text-[10px] text-gray-400 font-bold leading-relaxed">Salin URL di bawah ke dashboard DOKU. Gunakan HTTPS untuk mode produksi.</p>
+                    <p className="text-[10px] text-gray-400 font-bold leading-relaxed">Gunakan URL ini di Dashboard DOKU untuk menerima notifikasi pembayaran sukses secara otomatis.</p>
                     <div className="bg-white/5 p-4 rounded-xl border border-white/10 font-mono text-[10px] break-all select-all text-orange-300">
                        {window.location.origin}/api/webhook
                     </div>
-                 </div>
-                 <div className="pt-4 flex items-center gap-3">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Webhook Handler Ready</span>
                  </div>
               </div>
            </div>
@@ -202,12 +178,12 @@ const PaymentSettingsPanel: React.FC = () => {
       {/* Pricing Packages */}
       <div className="bg-white rounded-[3rem] border shadow-sm p-10 space-y-8">
          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <h3 className="text-xs font-black text-orange-500 uppercase tracking-[0.3em] border-l-4 border-orange-500 pl-4">Manajemen Paket Kredit</h3>
+            <h3 className="text-xs font-black text-orange-500 uppercase tracking-[0.3em] border-l-4 border-orange-500 pl-4">Paket Top Up (Live)</h3>
             <button 
               onClick={handleAddPackage}
               className="px-8 py-3 bg-gray-100 text-gray-500 font-black rounded-xl text-[10px] uppercase hover:bg-orange-500 hover:text-white transition-all shadow-sm active:scale-95"
             >
-              + Paket Baru
+              + Buat Paket Baru
             </button>
          </div>
 
@@ -215,26 +191,23 @@ const PaymentSettingsPanel: React.FC = () => {
             {settings.packages.map(pkg => (
               <div key={pkg.id} className="p-8 bg-gray-50/50 rounded-[2.5rem] border border-gray-100 space-y-6 group hover:border-orange-200 transition-all hover:shadow-xl relative overflow-hidden">
                  <div className="flex justify-between items-start">
-                    <div className="w-12 h-12 orange-gradient rounded-2xl flex items-center justify-center text-white text-2xl shadow-xl">💎</div>
+                    <div className="w-12 h-12 orange-gradient rounded-2xl flex items-center justify-center text-white text-2xl shadow-xl">💰</div>
                     <div className="flex gap-2">
                       <button 
                         onClick={() => handleDeletePackage(pkg.id)}
                         className="w-8 h-8 rounded-lg bg-white border border-rose-100 text-rose-500 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all opacity-0 group-hover:opacity-100"
-                        title="Hapus Paket"
-                      >
-                        🗑️
-                      </button>
+                      >🗑️</button>
                       <button 
                         onClick={() => updatePackage(pkg.id, 'isActive', !pkg.isActive)}
-                        className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${pkg.isActive ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200' : 'bg-gray-300 text-white'}`}
+                        className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${pkg.isActive ? 'bg-emerald-500 text-white' : 'bg-gray-300 text-white'}`}
                       >
-                        {pkg.isActive ? 'Aktif' : 'Draft'}
+                        {pkg.isActive ? 'Live' : 'Hidden'}
                       </button>
                     </div>
                  </div>
                  <div className="space-y-4">
                     <div className="space-y-1">
-                       <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Nama Paket</label>
+                       <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Label Produk</label>
                        <input 
                          type="text" 
                          className="w-full px-4 py-2.5 rounded-xl border bg-white font-bold text-sm outline-none focus:border-orange-500 shadow-sm"
@@ -244,7 +217,7 @@ const PaymentSettingsPanel: React.FC = () => {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-1">
-                          <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Kredit</label>
+                          <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Kredit AI</label>
                           <input 
                             type="number" 
                             className="w-full px-4 py-2.5 rounded-xl border bg-white font-bold text-sm outline-none focus:border-orange-500 shadow-sm"
@@ -253,7 +226,7 @@ const PaymentSettingsPanel: React.FC = () => {
                           />
                        </div>
                        <div className="space-y-1">
-                          <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Harga (Rp)</label>
+                          <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Harga Real (Rp)</label>
                           <input 
                             type="number" 
                             className="w-full px-4 py-2.5 rounded-xl border bg-white font-bold text-sm outline-none focus:border-orange-500 shadow-sm"
@@ -263,16 +236,8 @@ const PaymentSettingsPanel: React.FC = () => {
                        </div>
                     </div>
                  </div>
-                 <p className="text-[8px] text-gray-400 font-bold uppercase italic text-center">
-                    ID: {pkg.id.substring(0, 8)}...
-                 </p>
               </div>
             ))}
-            {settings.packages.length === 0 && (
-              <div className="col-span-full py-16 text-center border-2 border-dashed border-gray-100 rounded-[3rem]">
-                <p className="text-gray-300 font-black uppercase text-[10px] tracking-widest">Belum ada paket harga yang dibuat.</p>
-              </div>
-            )}
          </div>
       </div>
     </div>
