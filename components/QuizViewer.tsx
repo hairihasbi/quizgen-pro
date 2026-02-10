@@ -52,14 +52,12 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
   };
 
   const handleNativePrint = async () => {
-    // Untuk print, kita butuh typeset SEMUA dulu agar tidak ada LaTeX mentah yang tercetak
+    // Beri waktu sejenak agar UI benar-benar siap
     if ((window as any).MathJax && (window as any).MathJax.typesetPromise) {
         const items = document.querySelectorAll('.mjx-item');
         await (window as any).MathJax.typesetPromise(Array.from(items));
     }
-    setTimeout(() => {
-        window.print();
-    }, 300);
+    window.print();
   };
 
   const handleExportToGoogleForms = async () => {
@@ -67,9 +65,8 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
     try {
       const formUrl = await GoogleFormsService.exportToForms(quiz);
       window.open(formUrl, '_blank');
-      alert("Berhasil! Kuis draf Anda telah dibuat di Google Forms.");
     } catch (err: any) {
-      alert("Gagal ekspor ke Google Forms: " + err.message);
+      alert("Gagal ekspor: " + err.message);
     } finally {
       setIsExporting(false);
     }
@@ -80,81 +77,46 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
     try {
       const docUrl = await GoogleDocsService.exportToDocs(quiz);
       window.open(docUrl, '_blank');
-      alert("Berhasil! Dokumen draf soal telah dibuat di Google Docs.");
     } catch (err: any) {
-      alert("Gagal ekspor ke Google Docs: " + err.message);
+      alert("Gagal ekspor: " + err.message);
     } finally {
       setIsExportingDocs(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-orange-50/95 backdrop-blur-2xl z-[500] flex flex-col p-4 md:p-8 animate-in zoom-in-95 duration-300 print-modal-wrapper" role="dialog" aria-labelledby="viewer-quiz-title">
+    <div className="fixed inset-0 bg-orange-50/95 backdrop-blur-2xl z-[500] flex flex-col p-4 md:p-8 animate-in zoom-in-95 duration-300 print-modal-wrapper" role="dialog">
       
-      {/* Header kontrol (disembunyikan saat print via CSS .no-print) */}
+      {/* Tombol Kontrol (Disembunyikan saat print via .no-print) */}
       <header className="flex flex-col lg:flex-row justify-between items-center bg-white p-5 rounded-[2.5rem] shadow-xl shadow-orange-100/50 mb-6 border border-orange-100 gap-4 no-print text-gray-900">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 orange-gradient rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg" aria-hidden="true">📄</div>
+          <div className="w-12 h-12 orange-gradient rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg">📄</div>
           <div>
-            <h2 id="viewer-quiz-title" className="font-black text-gray-800 uppercase text-[10px] tracking-tight truncate max-w-[220px]">{quiz.title}</h2>
-            <div className="text-[8px] font-bold text-orange-500 uppercase mt-1">Preview Mode: {exportMode}</div>
+            <h2 className="font-black text-gray-800 uppercase text-[10px] tracking-tight truncate max-w-[220px]">{quiz.title}</h2>
+            <div className="text-[8px] font-bold text-orange-500 uppercase mt-1">Preview: {exportMode}</div>
           </div>
         </div>
         
         <div className="flex flex-wrap items-center justify-center gap-2">
-          <div className="flex gap-1 bg-orange-50 p-1 rounded-2xl border border-orange-100" role="group">
-             <button 
-              onClick={() => { setExportMode('soal'); setShowAnswer(false); }} 
-              className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all outline-none ${exportMode === 'soal' ? 'bg-white text-orange-600 shadow-sm' : 'text-orange-300'}`}
-             >SOAL</button>
-             <button 
-              onClick={() => { setExportMode('kisi-kisi'); setShowAnswer(false); }} 
-              className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all outline-none ${exportMode === 'kisi-kisi' ? 'bg-white text-orange-600 shadow-sm' : 'text-orange-300'}`}
-             >KISI-KISI</button>
-             <button 
-              onClick={() => { setExportMode('lengkap'); setShowAnswer(true); }} 
-              className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all outline-none ${exportMode === 'lengkap' ? 'bg-white text-orange-600 shadow-sm' : 'text-orange-300'}`}
-             >LENGKAP</button>
+          <div className="flex gap-1 bg-orange-50 p-1 rounded-2xl border border-orange-100">
+             <button onClick={() => { setExportMode('soal'); setShowAnswer(false); }} className={`px-4 py-2 rounded-xl text-[9px] font-black transition-all ${exportMode === 'soal' ? 'bg-white text-orange-600 shadow-sm' : 'text-orange-300'}`}>SOAL</button>
+             <button onClick={() => { setExportMode('kisi-kisi'); setShowAnswer(false); }} className={`px-4 py-2 rounded-xl text-[9px] font-black transition-all ${exportMode === 'kisi-kisi' ? 'bg-white text-orange-600 shadow-sm' : 'text-orange-300'}`}>KISI-KISI</button>
+             <button onClick={() => { setExportMode('lengkap'); setShowAnswer(true); }} className={`px-4 py-2 rounded-xl text-[9px] font-black transition-all ${exportMode === 'lengkap' ? 'bg-white text-orange-600 shadow-sm' : 'text-orange-300'}`}>LENGKAP</button>
           </div>
-          
-          <button 
-            onClick={handleExportToGoogleDocs}
-            disabled={isExportingDocs}
-            className="px-6 py-3 bg-[#4285f4] text-white rounded-2xl text-[10px] font-black hover:scale-105 transition-all shadow-xl uppercase outline-none focus:ring-4 focus:ring-blue-300 flex items-center gap-2"
-          >
-            {isExportingDocs ? 'Saving...' : '📄 Ke Google Doc'}
-          </button>
-
-          <button 
-            onClick={handleExportToGoogleForms}
-            disabled={isExporting}
-            className="px-6 py-3 bg-[#673ab7] text-white rounded-2xl text-[10px] font-black hover:scale-105 transition-all shadow-xl uppercase outline-none focus:ring-4 focus:ring-purple-300 flex items-center gap-2"
-          >
-            {isExporting ? 'Exporting...' : '📝 Ke Google Form'}
-          </button>
-
-          <button 
-            onClick={handleNativePrint} 
-            className="px-6 py-3 orange-gradient text-white rounded-2xl text-[10px] font-black hover:scale-105 transition-all shadow-xl uppercase outline-none focus:ring-4 focus:ring-orange-300"
-          >
-            🖨️ Cetak / PDF
-          </button>
-          
-          <button 
-            onClick={onClose} 
-            className="w-10 h-10 flex items-center justify-center text-orange-300 hover:text-red-500 font-black bg-orange-100/50 rounded-full outline-none"
-          >✕</button>
+          <button onClick={handleExportToGoogleDocs} disabled={isExportingDocs} className="px-6 py-3 bg-[#4285f4] text-white rounded-2xl text-[10px] font-black shadow-xl uppercase transition-all hover:scale-105">📄 Docs</button>
+          <button onClick={handleExportToGoogleForms} disabled={isExporting} className="px-6 py-3 bg-[#673ab7] text-white rounded-2xl text-[10px] font-black shadow-xl uppercase transition-all hover:scale-105">📝 Forms</button>
+          <button onClick={handleNativePrint} className="px-6 py-3 orange-gradient text-white rounded-2xl text-[10px] font-black shadow-xl uppercase transition-all hover:scale-105">🖨️ Cetak</button>
+          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center text-orange-300 hover:text-red-500 bg-orange-100/50 rounded-full">✕</button>
         </div>
       </header>
 
-      {/* Area View yang menjadi Scrollable di Web namun Static di Print */}
+      {/* Kontainer Scrollable yang akan dipaksa Static saat Print */}
       <div className="flex-1 overflow-y-auto p-4 md:p-10 flex justify-center custom-scrollbar bg-orange-100/20 rounded-[3rem] print-scroll-container">
         <div id="quiz-print-area" className="print-container bg-white shadow-2xl transition-all duration-500 text-gray-900 w-full md:w-[210mm] min-h-screen py-[15mm]">
-          
           <div className="print-watermark">GENZ QUIZGEN PRO</div>
 
           {/* KOP SOAL */}
-          <div className="pdf-block px-[20mm]">
+          <div className="pdf-block px-[20mm] border-none">
              <div className="border-b-4 border-double border-gray-900 pb-4 mb-6 text-center">
                 <h1 className="text-2xl font-black uppercase tracking-tight text-gray-900">{quiz.title}</h1>
                 <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-gray-600 mt-1">
@@ -186,6 +148,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
              </div>
           </div>
 
+          {/* DAFTAR SOAL */}
           <div className="px-[20mm]">
             {(exportMode === 'soal' || exportMode === 'lengkap') && (
               <div className="space-y-0">
@@ -194,9 +157,9 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                   const isNewType = i === 0 || quiz.questions[i-1].type !== q.type;
                   
                   return (
-                    <div key={q.id} className="mjx-item math-loading pdf-block py-6 border-b border-gray-100 print:border-gray-200">
+                    <div key={q.id} className="mjx-item math-loading pdf-block py-6">
                         {isNewType && (
-                          <div className="mb-6 mt-4 no-print-bg">
+                          <div className="mb-6 mt-4">
                             <h3 className="text-[11px] font-black text-gray-900 uppercase tracking-[0.15em] border-l-4 border-gray-900 pl-3">
                               BAGIAN: {q.type.toUpperCase()}
                             </h3>
@@ -221,7 +184,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                             )}
                             {showAnswer && (
                               <div className="mt-4 p-5 bg-emerald-50 rounded-2xl border border-emerald-100 print:bg-white print:border-gray-300">
-                                <div className="text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-1 print:text-black">Kunci: {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</div>
+                                <div className="text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-1">Kunci: {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</div>
                                 <div className={`text-[12px] text-gray-600 italic ${getFontClass(quiz.subject)}`} dangerouslySetInnerHTML={{ __html: sanitizeHTML(q.explanation) }}></div>
                               </div>
                             )}
@@ -233,19 +196,19 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
               </div>
             )}
 
+            {/* TABEL KISI-KISI */}
             {exportMode === 'kisi-kisi' && (
-              <div className="pdf-block mt-8">
-                <h3 className="text-lg font-black text-gray-900 uppercase border-b-2 border-gray-900 mb-6 pb-2 text-center">Matriks Kisi-kisi Instrumen Penilaian</h3>
+              <div className="pdf-block mt-8 border-none">
+                <h3 className="text-lg font-black text-gray-900 uppercase border-b-2 border-gray-900 mb-6 pb-2 text-center">Kisi-kisi Instrumen Penilaian</h3>
                 <table className="w-full border-collapse border-2 border-gray-900 text-[10px]">
                   <thead>
                     <tr className="bg-gray-100 print:bg-gray-50">
                       <th className="border border-gray-900 p-2 w-8 text-center font-black">No</th>
                       <th className="border border-gray-900 p-2 text-center w-40 font-black">KD / TP</th>
                       <th className="border border-gray-900 p-2 text-center w-32 font-black">Materi</th>
-                      <th className="border border-gray-900 p-2 text-center font-black">Indikator Soal</th>
+                      <th className="border border-gray-900 p-2 text-center font-black">Indikator</th>
                       <th className="border border-gray-900 p-2 w-16 text-center font-black">Level</th>
                       <th className="border border-gray-900 p-2 w-20 text-center font-black">Bentuk</th>
-                      <th className="border border-gray-900 p-2 w-12 text-center font-black">No</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -257,7 +220,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                         <td className="mjx-item math-loading border border-gray-900 p-2 text-justify leading-relaxed">{q.indicator}</td>
                         <td className="border border-gray-900 p-2 text-center whitespace-nowrap">{getCognitiveLevelMapping(q.cognitiveLevel)}</td>
                         <td className="border border-gray-900 p-2 text-center">{q.type}</td>
-                        <td className="border border-gray-900 p-2 text-center font-black">{i + 1}</td>
                       </tr>
                     ))}
                   </tbody>
