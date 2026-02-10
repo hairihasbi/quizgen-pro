@@ -67,25 +67,34 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
 
     setIsDownloading(true);
 
-    // Pastikan MathJax ter-render
-    if ((window as any).MathJax && (window as any).MathJax.typesetPromise) {
-      await (window as any).MathJax.typesetPromise(Array.from(element.querySelectorAll('.mjx-item')));
-    }
-
-    const opt = {
-      margin: 15,
-      filename: `Quiz_${quiz.title.replace(/\s+/g, '_')}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, logging: false },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-    };
-
     try {
+      // 1. Paksa MathJax merender ulang seluruh area print agar masuk ke canvas
+      if ((window as any).MathJax && (window as any).MathJax.typesetPromise) {
+        await (window as any).MathJax.typesetPromise([element]);
+      }
+
+      // 2. Konfigurasi Presisi A4
+      const opt = {
+        margin: 0, // Menggunakan padding internal HTML untuk menghindari pemotongan konten
+        filename: `Quiz_${quiz.title.replace(/\s+/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 1.0 },
+        html2canvas: { 
+          scale: 2, 
+          useCORS: true, 
+          logging: false,
+          letterRendering: true,
+          scrollY: 0,
+          scrollX: 0
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      };
+
+      // 3. Eksekusi Download
       await (window as any).html2pdf().from(element).set(opt).save();
     } catch (err) {
       console.error("PDF Download Error:", err);
-      alert("Gagal mengunduh PDF. Gunakan tombol 'Cetak' sebagai alternatif.");
+      alert("Gagal mengunduh PDF. Pastikan koneksi internet stabil.");
     } finally {
       setIsDownloading(false);
     }
@@ -136,7 +145,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
           <button onClick={handleExportToGoogleDocs} disabled={isExportingDocs} className="px-6 py-3 bg-[#4285f4] text-white rounded-2xl text-[10px] font-black shadow-xl uppercase transition-all hover:scale-105">📄 Docs</button>
           <button onClick={handleExportToGoogleForms} disabled={isExporting} className="px-6 py-3 bg-[#673ab7] text-white rounded-2xl text-[10px] font-black shadow-xl uppercase transition-all hover:scale-105">📝 Forms</button>
           
-          {/* Tombol Download PDF Baru */}
           <button onClick={handleDownloadPdf} disabled={isDownloading} className="px-6 py-3 bg-gray-800 text-white rounded-2xl text-[10px] font-black shadow-xl uppercase transition-all hover:scale-105 flex items-center gap-2">
             {isDownloading ? <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin"></div> : '📥'} Download
           </button>
@@ -147,10 +155,10 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
       </header>
 
       <div className="flex-1 overflow-y-auto p-0 md:p-10 flex justify-center custom-scrollbar print-scroll-container">
-        <div id="quiz-print-area" className="print-container bg-white shadow-2xl text-gray-900 w-full md:w-[210mm] min-h-screen py-[10mm] px-[0mm] print:py-0 print:px-0">
+        <div id="quiz-print-area" className="print-container bg-white shadow-2xl text-gray-900 w-full md:w-[210mm] min-h-screen py-[15mm] px-[15mm] print:py-0 print:px-0">
           
           {/* HEADER / KOP SOAL */}
-          <div className="pdf-block px-[10mm] print:px-0">
+          <div className="pdf-block">
              <div className="border-b-4 border-double border-gray-900 pb-4 mb-6 text-center">
                 <h1 className="text-2xl font-black uppercase tracking-tight text-gray-900">{quiz.title}</h1>
                 <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-gray-600 mt-1">
@@ -158,33 +166,33 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                 </div>
              </div>
 
-             {/* DATA SISWA */}
-             <div className="grid grid-cols-2 gap-x-8 gap-y-4 p-6 border-2 border-gray-900 rounded-2xl mb-8">
+             {/* DATA SISWA - Menggunakan margin aman agar tidak terpotong saat ekspor */}
+             <div className="grid grid-cols-2 gap-x-8 gap-y-4 p-6 border-[3px] border-gray-900 rounded-2xl mb-8 mx-1">
                 <div className="flex items-center gap-3">
-                   <span className="w-20 shrink-0 font-black text-[11px] text-gray-500 uppercase">NAMA</span>
+                   <span className="w-20 shrink-0 font-black text-[11px] text-gray-600 uppercase">NAMA</span>
                    <span className="font-black text-gray-900">:</span>
-                   <div className="flex-1 border-b-2 border-dotted border-gray-300 h-5"></div>
+                   <div className="flex-1 border-b-2 border-dotted border-gray-400 h-5"></div>
                 </div>
                 <div className="flex items-center gap-3">
-                   <span className="w-20 shrink-0 font-black text-[11px] text-gray-500 uppercase">HARI / TGL</span>
+                   <span className="w-20 shrink-0 font-black text-[11px] text-gray-600 uppercase">HARI / TGL</span>
                    <span className="font-black text-gray-900">:</span>
-                   <div className="flex-1 border-b-2 border-dotted border-gray-300 h-5"></div>
+                   <div className="flex-1 border-b-2 border-dotted border-gray-400 h-5"></div>
                 </div>
                 <div className="flex items-center gap-3">
-                   <span className="w-20 shrink-0 font-black text-[11px] text-gray-500 uppercase">KELAS</span>
+                   <span className="w-20 shrink-0 font-black text-[11px] text-gray-600 uppercase">KELAS</span>
                    <span className="font-black text-gray-900">:</span>
-                   <div className="flex-1 border-b-2 border-dotted border-gray-300 h-5"></div>
+                   <div className="flex-1 border-b-2 border-dotted border-gray-400 h-5"></div>
                 </div>
                 <div className="flex items-center gap-3">
-                   <span className="w-20 shrink-0 font-black text-[11px] text-gray-500 uppercase">NO. ABSEN</span>
+                   <span className="w-20 shrink-0 font-black text-[11px] text-gray-600 uppercase">NO. ABSEN</span>
                    <span className="font-black text-gray-900">:</span>
-                   <div className="flex-1 border-b-2 border-dotted border-gray-300 h-5"></div>
+                   <div className="flex-1 border-b-2 border-dotted border-gray-400 h-5"></div>
                 </div>
              </div>
           </div>
 
           {/* AREA SOAL */}
-          <div className="px-[10mm] print:px-0">
+          <div className="mt-4">
             {(exportMode === 'soal' || exportMode === 'lengkap') && (
               <div className="space-y-0">
                 {quiz.questions.map((q, i) => {
