@@ -3,8 +3,8 @@ import { createClient } from '@libsql/client';
 import crypto from 'crypto';
 
 /**
- * DOKU Checkout API Handler - Production Fixed
- * Dokumen Referensi: https://dashboard.doku.com/docs/docs/jokul-checkout/api-reference/
+ * DOKU Checkout API Handler - Production Deep Fix
+ * Memastikan Signature & Digest identik dengan ekspektasi Server DOKU.
  */
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ message: 'Method Not Allowed' });
@@ -18,7 +18,7 @@ export default async function handler(req: any, res: any) {
   const { user, packageInfo } = req.body;
 
   try {
-    // 1. Ambil Kredensial
+    // 1. Ambil & Validasi Kredensial (Trim untuk hindari spasi tak sengaja)
     const resPayment = await db.execute("SELECT data FROM payment_settings WHERE id = 'global'");
     let dbSettings = resPayment.rows.length > 0 ? JSON.parse(resPayment.rows[0].data as string) : {};
 
@@ -26,23 +26,21 @@ export default async function handler(req: any, res: any) {
     const SECRET_KEY = (process.env.DOKU_SECRET_KEY || dbSettings.secretKey || "").trim();
 
     if (!CLIENT_ID || !SECRET_KEY) {
-      return res.status(500).json({ message: 'Kredensial DOKU (Client ID / Secret Key) kosong.' });
+      return res.status(500).json({ message: 'Kredensial DOKU (Client ID / Secret Key) tidak ditemukan.' });
     }
 
-    // 2. Persiapan Parameter
-    // Pastikan invoice_number unik (max 64 char)
-    const invoiceId = `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    // 2. Persiapan Parameter Wajib
+    const invoiceId = `INV${Date.now()}${Math.floor(Math.random() * 100)}`;
     const requestId = crypto.randomUUID();
     
-    // Format DOKU Wajib ISO8601: YYYY-MM-DDTHH:mm:ssZ
-    // Kita hilangkan milidetik karena DOKU sensitif terhadap hal ini
+    // Format Wajib: YYYY-MM-DDTHH:mm:ssZ (Tanpa milidetik)
     const timestamp = new Date().toISOString().split('.')[0] + 'Z';
     const targetPath = '/checkout/v1/payment';
 
-    // 3. Payload Body (Sesuai Struktur DOKU Checkout V1)
-    // DOKU melarang karakter spesial di nama customer
-    const cleanCustomerName = String(user.fullName || user.username || 'Guru QuizGen')
-      .replace(/[^a-zA-Z0-9 ]/g, '')
+    // 3. Kontruksi Payload (Data harus bersih)
+    // DOKU Production sangat sensitif terhadap karakter spesial di nama
+    const cleanName = String(user.fullName || user.username || 'Guru GenZ')
+      .replace(/[^a-zA-Z0-9 ]/g, '') // Hanya huruf, angka, dan spasi
       .substring(0, 32)
       .trim();
 
@@ -53,25 +51,27 @@ export default async function handler(req: any, res: any) {
         currency: "IDR",
         callback_url: "https://genquiz.my.id/history",
         line_items: [{
-          id: `PKG-${packageInfo.credits}`,
+          id: `PK-${packageInfo.credits}`,
           name: `Topup ${packageInfo.credits} Kredit AI`.substring(0, 50),
           price: Math.floor(Number(packageInfo.price || packageInfo.amount)),
           quantity: 1
         }]
       },
       customer: {
-        name: cleanCustomerName,
+        name: cleanName,
         email: String(user.email || `${user.username}@quizgen.pro`).trim().toLowerCase()
       }
     };
 
+    // PENTING: Stringify sekali saja untuk digunakan di Digest DAN Body Fetch
+    // untuk menjamin urutan properti JSON tidak berubah.
     const bodyString = JSON.stringify(payload);
 
-    // 4. Kalkulasi Digest (Base64 dari SHA256 binary hash dari BODY)
+    // 4. Kalkulasi Digest (Base64 dari SHA256 binary hash)
     const digestHash = crypto.createHash('sha256').update(bodyString).digest('base64');
 
-    // 5. Konstruksi String-To-Sign (URUTAN WAJIB)
-    // Tidak boleh ada spasi tambahan setelah titik dua atau di akhir baris
+    // 5. Konstruksi String-To-Sign (URUTAN MATI/TIDAK BOLEH BERUBAH)
+    // Pola: Client-Id:{ID}\nRequest-Id:{UUID}\nRequest-Timestamp:{ISO}\nRequest-Target:{PATH}\nDigest:{HASH}
     const stringToSign = 
       `Client-Id:${CLIENT_ID}\n` +
       `Request-Id:${requestId}\n` +
@@ -85,13 +85,22 @@ export default async function handler(req: any, res: any) {
       .update(stringToSign)
       .digest('base64');
 
-    // Simpan Log ke DB (Pending)
+    // Log Internal (Hanya muncul di Vercel Dashboard Anda, aman)
+    console.log("[DOKU_STILL_DEBUGGING]", {
+      inv: invoiceId,
+      ts: timestamp,
+      req: requestId,
+      digest: digestHash,
+      sign_preview: signature.substring(0, 10) + "..."
+    });
+
+    // Simpan status PENDING ke DB
     await db.execute({
       sql: "INSERT INTO transactions (id, userId, amount, credits, status, externalId, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
       args: [crypto.randomUUID(), user.id, payload.order.amount, packageInfo.credits, 'PENDING', invoiceId, new Date().toISOString()]
     });
 
-    // 7. Kirim Request ke DOKU Production
+    // 7. Eksekusi ke Endpoint Production DOKU
     const response = await fetch(`https://api.doku.com${targetPath}`, {
       method: 'POST',
       headers: {
@@ -99,7 +108,7 @@ export default async function handler(req: any, res: any) {
         'Request-Id': requestId,
         'Request-Timestamp': timestamp,
         'Signature': `HMACSHA256=${signature}`,
-        'Digest': `SHA-256=${digestHash}`, // Prefix SHA-256= Wajib ada di header
+        'Digest': `SHA-256=${digestHash}`, // Pastikan ada prefix SHA-256=
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
@@ -111,26 +120,20 @@ export default async function handler(req: any, res: any) {
     if (response.ok && data.response?.payment?.url) {
       return res.status(200).json(data);
     } else {
-      console.error("[DOKU_REJECTED]", {
-        status: response.status,
-        requestId,
-        invoiceId,
-        error: data
-      });
+      console.error("[DOKU_PRODUCTION_REJECTION]", data);
 
-      // Berikan detail error asli dari DOKU jika tersedia
-      let errorMessage = "Terjadi kesalahan di server DOKU (500).";
+      let detailError = "Periksa konfigurasi Merchant Dashboard (URL White-list/Payment Methods).";
       if (data.error?.message) {
-         errorMessage = Array.isArray(data.error.message) ? data.error.message.join('. ') : data.error.message;
+         detailError = Array.isArray(data.error.message) ? data.error.message.join('. ') : data.error.message;
       }
 
       return res.status(response.status).json({
-        message: `DOKU Response: ${errorMessage}`,
+        message: `DOKU Error: ${detailError}`,
         details: data
       });
     }
   } catch (error: any) {
-    console.error("[FATAL_CHECKOUT_ERROR]", error);
-    return res.status(500).json({ message: `Internal System Error: ${error.message}` });
+    console.error("[CHECKOUT_CRITICAL_FAIL]", error);
+    return res.status(500).json({ message: `System Error: ${error.message}` });
   }
 }
