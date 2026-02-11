@@ -13,17 +13,30 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isClientExporting, setIsClientExporting] = useState(false);
 
-  // Grouping questions by type for better document structure
+  // 1. Urutkan soal berdasarkan urutan tipe standar agar penomoran tidak loncat
+  const sortedQuestions = useMemo(() => {
+    const typeOrder = [
+      QuestionType.MCQ,
+      QuestionType.COMPLEX_MCQ,
+      QuestionType.TRUE_FALSE,
+      QuestionType.SHORT_ANSWER,
+      QuestionType.ESSAY
+    ];
+    return [...quiz.questions].sort((a, b) => {
+      return typeOrder.indexOf(a.type) - typeOrder.indexOf(b.type);
+    });
+  }, [quiz.questions]);
+
+  // 2. Kelompokkan soal yang sudah diurutkan
   const groupedQuestions = useMemo(() => {
     const groups: Record<string, Question[]> = {};
-    quiz.questions.forEach(q => {
+    sortedQuestions.forEach(q => {
       if (!groups[q.type]) groups[q.type] = [];
       groups[q.type].push(q);
     });
     return groups;
-  }, [quiz.questions]);
+  }, [sortedQuestions]);
 
-  // Map C1-C6 to L1-L3
   const getCognitiveLevelLabel = (level: string) => {
     const l = level.toUpperCase();
     if (l.includes('C1') || l.includes('C2')) return 'L1';
@@ -37,7 +50,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
     if (el && (window as any).MathJax && (window as any).MathJax.typesetPromise) {
       try {
         await (window as any).MathJax.typesetPromise([el]);
-        await new Promise(r => setTimeout(r, 500));
       } catch (err) {
         console.warn("MathJax typeset failed", err);
       }
@@ -49,7 +61,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
       triggerMathJax('quiz-print-area');
     }, 300);
     return () => clearTimeout(timer);
-  }, [quiz, showAnswer, exportMode]);
+  }, [quiz, showAnswer, exportMode, sortedQuestions]);
 
   const handleExportPdfClient = async () => {
     const element = document.getElementById('quiz-print-area');
@@ -87,7 +99,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          quiz, 
+          quiz: { ...quiz, questions: sortedQuestions }, // Kirim yang sudah sorted
           showAnswer: exportMode === 'lengkap' || showAnswer,
           mode: exportMode
         })
@@ -109,6 +121,9 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
       setIsDownloading(false);
     }
   };
+
+  // Variable untuk melacak nomor urut global saat mapping
+  let globalIndex = 0;
 
   return (
     <div className="fixed inset-0 bg-orange-50/98 backdrop-blur-3xl z-[500] flex flex-col p-4 md:p-8 animate-in zoom-in-95 duration-300 print-modal-wrapper" role="dialog">
@@ -152,7 +167,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
           
           <div className="border-t-[3px] border-b border-black h-[5px] mb-6"></div>
 
-          {/* Form Identitas Siswa */}
           <div className="mb-10">
             <table className="w-full border-collapse text-[10.5pt]">
               <tbody>
@@ -190,7 +204,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {quiz.questions.map((q, i) => (
+                    {sortedQuestions.map((q, i) => (
                       <tr key={q.id}>
                         <td className="border-2 border-black p-2 text-center font-bold">{i + 1}</td>
                         <td className="border-2 border-black p-2 align-top text-justify">
@@ -214,14 +228,13 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
             ) : (
               Object.entries(groupedQuestions).map(([type, questions], gIdx) => (
                 <div key={type} className="space-y-6">
-                  {/* Header Tipe Soal */}
                   <div className="bg-gray-100 px-6 py-2 border-y-2 border-black font-black text-[11pt] uppercase tracking-tighter">
                     {String.fromCharCode(65 + gIdx)}. {type}
                   </div>
                   
                   <div className="space-y-8">
                     {questions.map((q, i) => {
-                      const absoluteIndex = quiz.questions.findIndex(allQ => allQ.id === q.id) + 1;
+                      globalIndex++; // Tambah counter global setiap butir soal
                       const isNewPassage = q.passage && (i === 0 || questions[i-1].passage !== q.passage);
                       
                       return (
@@ -233,7 +246,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                             </div>
                           )}
                           <div className="flex gap-4 text-[11pt] leading-relaxed">
-                            <div className="font-bold w-6 shrink-0 text-right">{absoluteIndex}.</div>
+                            <div className="font-bold w-6 shrink-0 text-right">{globalIndex}.</div>
                             <div className="flex-1">
                               <div className="mb-3 text-justify" dangerouslySetInnerHTML={{ __html: q.text }}></div>
                               
