@@ -65,7 +65,15 @@ const History: React.FC<HistoryProps> = ({ user }) => {
                   </td>
                   <td className="px-8 py-6">
                     <div className="font-bold text-gray-800 group-hover:text-orange-500 transition-colors">{quiz.title}</div>
-                    <div className="text-[10px] text-gray-400 font-bold uppercase">{new Date(quiz.createdAt).toLocaleDateString()}</div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] text-gray-400 font-bold uppercase">
+                        📅 {new Date(quiz.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </span>
+                      <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                      <span className="text-[10px] text-orange-400 font-black uppercase">
+                        🕒 {new Date(quiz.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-8 py-6">
                     <div className="text-xs font-black text-gray-600">{quiz.subject}</div>
