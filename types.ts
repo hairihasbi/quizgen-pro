@@ -142,6 +142,7 @@ export interface PaymentPackage {
   credits: number;
   price: number;
   isActive: boolean;
+  paymentLink?: string; // Properti baru untuk Link Pembayaran Langsung
 }
 
 export interface PaymentSettings {
