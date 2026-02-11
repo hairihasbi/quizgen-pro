@@ -624,6 +624,19 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
                    </div>
                 </div>
 
+                <div className="space-y-2">
+                  <label htmlFor="lang-select" className="text-[10px] font-black text-gray-400 uppercase ml-4 tracking-widest">Bahasa Pengantar</label>
+                  <select id="lang-select" aria-label="Pilih bahasa pengantar soal" className="w-full px-6 py-4 rounded-2xl bg-gray-50 font-black shadow-inner border-2 border-transparent focus:border-orange-500 outline-none" value={formData.language} onChange={e => setFormData({...formData, language: e.target.value})}>
+                    <option value="Bahasa Indonesia">Bahasa Indonesia</option>
+                    <option value="Bahasa Inggris">Bahasa Inggris</option>
+                    <option value="Bahasa Arab">Bahasa Arab</option>
+                    <option value="Bahasa Jepang">Bahasa Jepang</option>
+                    <option value="Bahasa Mandarin">Bahasa Mandarin</option>
+                    <option value="Bahasa Jerman">Bahasa Jerman</option>
+                    <option value="Bahasa Perancis">Bahasa Perancis</option>
+                  </select>
+                </div>
+
                 <div className="p-8 border-4 border-dashed border-gray-100 rounded-[3rem] text-center cursor-pointer hover:bg-orange-50 transition-all focus:ring-4 focus:ring-orange-100 outline-none" role="button" tabIndex={0} aria-label={fileName ? `File terpilih: ${fileName}. Klik untuk ganti.` : 'Klik untuk unggah file referensi materi dalam format .TXT'} onClick={() => fileInputRef.current?.click()} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && fileInputRef.current?.click()}>
                    <div className="text-3xl mb-2" aria-hidden="true">📄</div>
                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{fileName || 'Upload .TXT Referensi'}</p>
