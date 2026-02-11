@@ -4,7 +4,7 @@ import { StorageService } from '../services/storageService';
 import { Quiz } from '../types';
 import { SUBJECT_DATA } from '../constants';
 import QuizViewer from '../components/QuizViewer';
-import { QuizCardSkeleton, Skeleton } from '../components/Skeleton';
+import { QuizCardSkeleton } from '../components/Skeleton';
 
 const PublicGallery: React.FC = () => {
   const [allQuizzes, setAllQuizzes] = useState<Quiz[]>([]);
@@ -16,52 +16,59 @@ const PublicGallery: React.FC = () => {
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
   const itemsPerPage = 6;
 
-  useEffect(() => {
-    // MENGGUNAKAN EDGE CACHED API
-    const fetchPublicData = async () => {
-      try {
-        const response = await fetch('/api/bank-soal');
-        if (response.ok) {
-          const data = await response.json();
-          setAllQuizzes(data);
-        } else {
-          // Fallback ke local storage jika API gagal
-          const local = await StorageService.getQuizzes();
-          setAllQuizzes(local.filter(q => q.isPublished));
-        }
-      } catch (e) {
-        console.warn("Cached API failed, using fallback.");
-      } finally {
-        setLoading(false);
+  const fetchPublicData = async () => {
+    try {
+      // Tambahkan timestamp agar browser tidak melakukan caching pada URL API
+      const response = await fetch(`/api/bank-soal?t=${Date.now()}`);
+      if (response.ok) {
+        const data = await response.json();
+        setAllQuizzes(data);
+      } else {
+        throw new Error("API Response not OK");
       }
-    };
+    } catch (e) {
+      console.warn("API Public failed, falling back to local sync.");
+      // Fallback: Ambil dari database lokal/cloud via service jika API endpoint bermasalah
+      const local = await StorageService.getQuizzes();
+      setAllQuizzes(local.filter(q => q.isPublished));
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchPublicData();
   }, []);
 
   const filteredQuizzes = useMemo(() => {
-    setCurrentPage(1);
+    // Kembalikan ke halaman 1 setiap kali filter berubah
     return allQuizzes.filter(q => {
       const matchSearch = q.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          q.subject.toLowerCase().includes(searchTerm.toLowerCase());
+                          q.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          q.topic.toLowerCase().includes(searchTerm.toLowerCase());
       const matchSubject = selectedSubject === 'Semua' || q.subject === selectedSubject;
       const matchDiff = selectedDifficulty === 'Semua' || q.difficulty === selectedDifficulty;
       return matchSearch && matchSubject && matchDiff;
     });
   }, [searchTerm, selectedSubject, selectedDifficulty, allQuizzes]);
 
-  const currentQuizzes = filteredQuizzes.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const currentQuizzes = useMemo(() => {
+    return filteredQuizzes.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [filteredQuizzes, currentPage]);
+
   const totalPages = Math.ceil(filteredQuizzes.length / itemsPerPage);
 
   const allSubjectsList = useMemo(() => {
-    const combined: string[] = [];
-    Object.values(SUBJECT_DATA).forEach(levelData => {
-      Object.values(levelData).forEach(subjects => {
-        combined.push(...subjects);
-      });
+    const combined = new Set<string>();
+    combined.add('Semua');
+    
+    // Ambil subject yang memang ada di data saja agar filter efisien
+    allQuizzes.forEach(q => {
+      if (q.subject) combined.add(q.subject);
     });
-    return ['Semua', ...Array.from(new Set(combined))];
-  }, []);
+
+    return Array.from(combined).sort();
+  }, [allQuizzes]);
 
   return (
     <div className="min-h-screen bg-[#fffaf0] pb-24 font-sans animate-in fade-in duration-700">
@@ -77,6 +84,7 @@ const PublicGallery: React.FC = () => {
             Akses ribuan soal kurikulum merdeka yang telah diverifikasi oleh AI Engine dan dikurasi oleh pengajar profesional.
           </p>
         </div>
+        <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
       </header>
 
       <div className="max-w-7xl mx-auto px-6 -mt-16 relative z-20">
@@ -89,10 +97,9 @@ const PublicGallery: React.FC = () => {
                 id="search-input"
                 type="text" 
                 placeholder="Contoh: Trigonometri, Biologi Sel..." 
-                aria-label="Cari judul atau materi quiz"
                 className="w-full pl-16 pr-8 py-5 rounded-[2.5rem] bg-gray-50 border-2 border-transparent focus:border-orange-500 focus:bg-white outline-none transition-all text-gray-800 font-bold shadow-inner" 
                 value={searchTerm} 
-                onChange={(e) => setSearchTerm(e.target.value)} 
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} 
               />
             </div>
           </div>
@@ -100,10 +107,9 @@ const PublicGallery: React.FC = () => {
             <label htmlFor="subject-select" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-6">Mata Pelajaran</label>
             <select 
               id="subject-select"
-              aria-label="Filter berdasarkan mata pelajaran"
               className="w-full px-8 py-5 rounded-[2.5rem] bg-gray-50 border-2 border-transparent focus:border-orange-500 focus:bg-white outline-none font-bold appearance-none cursor-pointer shadow-inner" 
               value={selectedSubject} 
-              onChange={(e) => setSelectedSubject(e.target.value)}
+              onChange={(e) => { setSelectedSubject(e.target.value); setCurrentPage(1); }}
             >
               {allSubjectsList.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -111,49 +117,69 @@ const PublicGallery: React.FC = () => {
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-6 mt-20" aria-label="Galeri Soal">
+      <main className="max-w-7xl mx-auto px-6 mt-20">
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
             {[1, 2, 3, 4, 5, 6].map(i => <QuizCardSkeleton key={i} />)}
           </div>
-        ) : currentQuizzes.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10" role="list">
-            {currentQuizzes.map((quiz) => (
-              <div 
-                key={quiz.id} 
-                onClick={() => setSelectedQuiz(quiz)} 
-                onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setSelectedQuiz(quiz)}
-                tabIndex={0}
-                role="button"
-                aria-label={`Lihat quiz: ${quiz.title}. Mapel: ${quiz.subject}. Kesulitan: ${quiz.difficulty}`}
-                className="group bg-white rounded-[3.5rem] p-10 border border-orange-50 shadow-sm hover:shadow-orange-200/50 hover:shadow-2xl transition-all duration-500 hover:-translate-y-4 cursor-pointer flex flex-col h-full relative overflow-hidden outline-none focus:ring-4 focus:ring-orange-500"
-              >
-                <div className="flex justify-between items-center mb-10">
-                  <span className="px-5 py-2 bg-orange-50 text-orange-600 rounded-2xl text-[9px] font-black uppercase tracking-widest border border-orange-100">{quiz.subject}</span>
-                  <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase ${quiz.difficulty === 'Sulit' ? 'bg-rose-50 text-rose-500' : 'bg-emerald-50 text-emerald-500'}`}>{quiz.difficulty}</span>
-                </div>
-                <h3 className="text-2xl font-black text-gray-800 mb-4 group-hover:text-orange-500 transition-colors line-clamp-2 leading-tight">{quiz.title}</h3>
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-8">{quiz.level} • {quiz.grade} • {quiz.questions.length} Soal</div>
-                <div className="flex items-center justify-between pt-8 border-t border-gray-50 mt-auto">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl orange-gradient flex items-center justify-center text-white font-black text-lg shadow-xl" aria-hidden="true">{quiz.authorName?.[0] || 'U'}</div>
-                    <div className="text-xs font-black text-gray-800">{quiz.authorName || 'Teacher'}</div>
+        ) : filteredQuizzes.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+              {currentQuizzes.map((quiz) => (
+                <div 
+                  key={quiz.id} 
+                  onClick={() => setSelectedQuiz(quiz)} 
+                  className="group bg-white rounded-[3.5rem] p-10 border border-orange-50 shadow-sm hover:shadow-orange-200/50 hover:shadow-2xl transition-all duration-500 hover:-translate-y-4 cursor-pointer flex flex-col h-full relative overflow-hidden outline-none focus:ring-4 focus:ring-orange-500"
+                >
+                  <div className="flex justify-between items-center mb-10">
+                    <span className="px-5 py-2 bg-orange-50 text-orange-600 rounded-2xl text-[9px] font-black uppercase tracking-widest border border-orange-100">{quiz.subject}</span>
+                    <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase ${quiz.difficulty === 'Sulit' ? 'bg-rose-50 text-rose-500' : 'bg-emerald-50 text-emerald-500'}`}>{quiz.difficulty}</span>
                   </div>
-                  <button 
-                    aria-label={`Buka ${quiz.title}`}
-                    className="w-12 h-12 bg-gray-900 text-white rounded-2xl flex items-center justify-center hover:bg-orange-500 hover:scale-110 transition-all shadow-xl focus:ring-2 focus:ring-orange-500"
-                  >➜</button>
+                  <h3 className="text-2xl font-black text-gray-800 mb-4 group-hover:text-orange-500 transition-colors line-clamp-2 leading-tight">{quiz.title}</h3>
+                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-8">{quiz.level} • {quiz.grade} • {quiz.questions?.length || 0} Soal</div>
+                  
+                  <div className="flex items-center justify-between pt-8 border-t border-gray-50 mt-auto">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl orange-gradient flex items-center justify-center text-white font-black text-lg shadow-xl">
+                        {quiz.authorName?.[0] || 'T'}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-black text-gray-800">{quiz.authorName || 'Teacher'}</span>
+                        <span className="text-[8px] text-orange-500 font-bold uppercase tracking-widest">Verified Assets</span>
+                      </div>
+                    </div>
+                    <button className="w-12 h-12 bg-gray-900 text-white rounded-2xl flex items-center justify-center hover:bg-orange-500 hover:scale-110 transition-all shadow-xl">➜</button>
+                  </div>
                 </div>
+              ))}
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex justify-center mt-20 gap-4">
+                <button 
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => prev - 1)}
+                  className="px-8 py-4 bg-white border border-orange-100 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-orange-50 disabled:opacity-30 transition-all"
+                >Prev</button>
+                <div className="flex items-center px-6 bg-white rounded-2xl border border-orange-100 font-black text-[10px] text-orange-500">
+                  HALAMAN {currentPage} DARI {totalPages}
+                </div>
+                <button 
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => prev + 1)}
+                  className="px-8 py-4 bg-white border border-orange-100 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-orange-50 disabled:opacity-30 transition-all"
+                >Next</button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         ) : (
-          <div className="py-40 text-center">
+          <div className="py-40 text-center space-y-6">
+            <div className="text-8xl grayscale opacity-10">📚</div>
             <h3 className="text-3xl font-black text-gray-300 uppercase tracking-tighter">Bank Soal Kosong</h3>
+            <p className="text-gray-400 font-medium max-w-md mx-auto">Kami tidak menemukan soal yang sesuai dengan filter Anda. Coba reset pencarian.</p>
             <button 
-              onClick={() => { setSearchTerm(''); setSelectedSubject('Semua'); }} 
-              aria-label="Bersihkan semua filter pencarian"
-              className="mt-8 px-8 py-3 bg-orange-100 text-orange-600 font-black rounded-2xl text-[10px] uppercase tracking-widest hover:bg-orange-500 hover:text-white transition-all focus:ring-2 focus:ring-orange-500"
+              onClick={() => { setSearchTerm(''); setSelectedSubject('Semua'); setSelectedDifficulty('Semua'); }} 
+              className="mt-8 px-8 py-4 bg-orange-100 text-orange-600 font-black rounded-2xl text-[10px] uppercase tracking-widest hover:bg-orange-500 hover:text-white transition-all shadow-lg"
             >Reset Filter</button>
           </div>
         )}
