@@ -27,7 +27,20 @@ export default async function handler(req: any, res: any) {
       return lvl;
     };
 
-    // Helper untuk grouping
+    // Urutkan soal berdasarkan tipe standar agar penomoran sinkron
+    const typeOrder = [
+      'Pilihan Ganda',
+      'Pilihan Ganda Kompleks',
+      'Benar/Salah',
+      'Isian Singkat',
+      'Uraian/Essay'
+    ];
+
+    const sortedQuestions = [...quiz.questions].sort((a, b) => {
+      return typeOrder.indexOf(a.type) - typeOrder.indexOf(b.type);
+    });
+
+    // Helper untuk grouping yang mempertahankan urutan
     const groupByType = (questions: any[]) => {
       const groups: Record<string, any[]> = {};
       questions.forEach(q => {
@@ -37,7 +50,8 @@ export default async function handler(req: any, res: any) {
       return groups;
     };
 
-    const grouped = groupByType(quiz.questions);
+    const grouped = groupByType(sortedQuestions);
+    let globalCounter = 0;
 
     const htmlContent = `
     <!DOCTYPE html>
@@ -151,7 +165,7 @@ export default async function handler(req: any, res: any) {
               </tr>
             </thead>
             <tbody>
-              ${quiz.questions.map((q: any, i: number) => `
+              ${sortedQuestions.map((q: any, i: number) => `
                 <tr>
                   <td style="text-align:center;">${i + 1}</td>
                   <td>${q.competency || `Menguasai topik ${q.topic}`}</td>
@@ -170,12 +184,12 @@ export default async function handler(req: any, res: any) {
             <div class="type-header">${String.fromCharCode(65 + gIdx)}. ${type}</div>
             <div class="questions">
               ${questions.map((q: any) => {
-                const absIdx = quiz.questions.findIndex((allQ: any) => allQ.id === q.id) + 1;
+                globalCounter++;
                 const isNewPassage = q.passage && (questions.indexOf(q) === 0 || questions[questions.indexOf(q)-1].passage !== q.passage);
                 return `
                   ${isNewPassage ? `<div class="passage"><strong>WACANA STIMULUS:</strong><br/>${q.passage}</div>` : ''}
                   <div class="question-item">
-                    <div class="q-num">${absIdx}.</div>
+                    <div class="q-num">${globalCounter}.</div>
                     <div class="q-body">
                       <div>${q.text}</div>
                       ${q.options && q.options.length > 0 ? `
