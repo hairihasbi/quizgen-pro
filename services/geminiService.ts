@@ -109,6 +109,7 @@ export class GeminiService {
     
     const prompt = `TUGAS: BUATKAN ${totalCount} SOAL UNTUK ${params.subject.toUpperCase()} TENTANG ${params.topic}.
     JENJANG: ${params.level} ${params.grade}. KESULITAN: ${params.difficulty}.
+    BAHASA PENGANTAR: ${params.language}.
     
     DISTRIBUSI TIPE SOAL WAJIB (TOTAL ${totalCount}):
     ${typeDistribution}
@@ -120,7 +121,7 @@ export class GeminiService {
     - Mode Literasi: ${params.literacyMode}. 
     ${params.literacyMode === 'Literasi Grup (AKM)' ? `Gunakan 1 wacana (stimulus) untuk setiap ${params.questionsPerPassage} soal.` : ''}
     
-    HARAP DIPERHATIKAN: Jangan membuat soal tipe lain selain yang disebutkan dalam distribusi di atas.`;
+    HARAP DIPERHATIKAN: Jangan membuat soal tipe lain selain yang disebutkan dalam distribusi di atas. Seluruh teks soal, opsi, dan penjelasan HARUS dalam ${params.language}.`;
 
     return this.executeTask(async (ai) => {
       const response = await ai.models.generateContent({
