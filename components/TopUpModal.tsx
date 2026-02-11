@@ -19,8 +19,8 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ user, onClose, onSuccess }) => 
   useEffect(() => {
     const loadPackages = async () => {
       const settings = await StorageService.getPaymentSettings();
-      // Hanya tampilkan 3 paket pertama yang aktif
-      setPackages(settings.packages.filter(p => p.isActive).slice(0, 3));
+      // Tampilkan semua paket yang aktif
+      setPackages(settings.packages.filter(p => p.isActive));
       setIsFetching(false);
     };
     loadPackages();
@@ -50,7 +50,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ user, onClose, onSuccess }) => 
   };
 
   const getPackageIcon = (index: number) => {
-    const icons = ['🐣', '🚀', '👑'];
+    const icons = ['🐣', '🚀', '👑', '💎', '🔥', '🌟'];
     return icons[index % icons.length];
   };
 
@@ -58,15 +58,17 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ user, onClose, onSuccess }) => 
     const colors = [
       'from-orange-400 to-orange-500',
       'from-orange-500 to-red-500',
-      'from-purple-500 to-orange-500'
+      'from-purple-500 to-orange-500',
+      'from-blue-500 to-indigo-500',
+      'from-emerald-500 to-teal-500'
     ];
     return colors[index % colors.length];
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-xl z-[200] flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in zoom-in-95 duration-300">
-        <div className="md:w-1/3 orange-gradient p-12 text-white flex flex-col justify-between relative overflow-hidden">
+    <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-xl z-[200] flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in zoom-in-95 duration-300 my-8">
+        <div className="md:w-1/4 orange-gradient p-12 text-white flex flex-col justify-between relative overflow-hidden shrink-0">
           <div className="relative z-10">
             <h3 className="text-3xl font-black leading-none mb-4 uppercase">ISI ULANG<br/>KREDIT AI</h3>
             <p className="text-white/80 font-medium text-sm">Pilih paket terbaik untuk menunjang produktivitas mengajar Anda.</p>
@@ -79,8 +81,8 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ user, onClose, onSuccess }) => 
           <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
         </div>
 
-        <div className="flex-1 p-8 md:p-12 space-y-8 bg-gray-50/50 relative">
-          <button onClick={onClose} className="absolute top-8 right-8 text-gray-300 hover:text-gray-600 transition-colors text-2xl">✕</button>
+        <div className="flex-1 p-8 md:p-12 space-y-8 bg-gray-50/50 relative overflow-y-auto custom-scrollbar">
+          <button onClick={onClose} className="absolute top-8 right-8 text-gray-300 hover:text-gray-600 transition-colors text-2xl z-10">✕</button>
           
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-4">
@@ -99,7 +101,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ user, onClose, onSuccess }) => 
               Menghubungkan ke Store...
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {packages.map((pkg, idx) => (
                 <button 
                   key={pkg.id}
@@ -111,7 +113,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ user, onClose, onSuccess }) => 
                     <span className="text-3xl">{getPackageIcon(idx)}</span>
                     <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${getPackageColor(idx)} opacity-20`}></div>
                   </div>
-                  <div className="font-black text-gray-800 group-hover:text-orange-600 transition-colors">{pkg.name}</div>
+                  <div className="font-black text-gray-800 group-hover:text-orange-600 transition-colors line-clamp-1">{pkg.name}</div>
                   <div className="text-2xl font-black text-gray-900 mt-1">
                      {pkg.credits} <span className="text-xs font-bold text-gray-400 uppercase">Kredit</span>
                   </div>
