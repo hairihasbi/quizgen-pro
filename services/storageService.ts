@@ -275,6 +275,17 @@ export const StorageService = {
     if (!client || _isLocal) return StorageService.localGet('logs');
     try { const res = await client.execute("SELECT * FROM logs ORDER BY timestamp DESC LIMIT 200"); return res.rows.map((row: any) => ({ id: row.id, timestamp: row.timestamp, category: row.category as LogCategory, action: row.action, details: row.details, status: row.status as any, userId: row.userId, metadata: row.metadata })); } catch(e) { return StorageService.localGet('logs'); }
   },
+  clearLogs: async () => {
+    StorageService.localSet('logs', []);
+    const client = StorageService.getClient();
+    if (client && !_isLocal) {
+      try {
+        await client.execute("DELETE FROM logs");
+      } catch (e) {
+        console.error("Gagal membersihkan log di cloud:", e);
+      }
+    }
+  },
   getTransactions: async (userId?: string): Promise<Transaction[]> => {
     const client = StorageService.getClient();
     if (!client || _isLocal) return StorageService.localGet('transactions').filter((t: any) => !userId || t.userId === userId);
