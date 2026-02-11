@@ -260,8 +260,8 @@ export const StorageService = {
   },
   getPaymentSettings: async (): Promise<PaymentSettings> => {
     const local = localStorage.getItem('quizgen_payment_settings');
-    // Force default mode to production
-    return local ? { ...JSON.parse(local), mode: 'production' } : { mode: 'production', clientId: '', secretKey: '', merchantName: 'GenZ QuizGen Store', callbackUrl: '', packages: [ { id: '1', name: 'Lite Pack', credits: 30, price: 30000, isActive: true }, { id: '2', name: 'Standard Pro', credits: 50, price: 50000, isActive: true }, { id: '3', name: 'Premium Guru', credits: 100, price: 100000, isActive: true } ] };
+    // Default 3 packages with direct payment links focus
+    return local ? JSON.parse(local) : { mode: 'production', clientId: '', secretKey: '', merchantName: 'GenZ QuizGen Store', callbackUrl: '', packages: [ { id: '1', name: 'Lite Pack', credits: 30, price: 30000, isActive: true, paymentLink: '' }, { id: '2', name: 'Standard Pro', credits: 50, price: 50000, isActive: true, paymentLink: '' }, { id: '3', name: 'Premium Guru', credits: 100, price: 100000, isActive: true, paymentLink: '' } ] };
   },
   savePaymentSettings: async (settings: PaymentSettings) => { localStorage.setItem('quizgen_payment_settings', JSON.stringify(settings)); const client = StorageService.getClient(); if (client && !_isLocal) { try { await client.execute({ sql: "INSERT OR REPLACE INTO payment_settings (id, data) VALUES ('global', ?)", args: [JSON.stringify(settings)] }); } catch(e){} } },
   addLog: async (log: QuizLog) => {

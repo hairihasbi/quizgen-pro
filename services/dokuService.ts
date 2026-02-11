@@ -4,31 +4,21 @@ import { StorageService } from './storageService';
 
 export const DokuService = {
   /**
-   * Menginisialisasi pembayaran ke DOKU via serverless function (Vercel)
+   * Mengambil link pembayaran langsung tanpa memanggil backend API
    */
-  async createInvoice(user: User, packageInfo: { amount: number, credits: number, name: string }): Promise<string> {
+  async getPaymentLink(user: User, packageInfo: { amount: number, credits: number, name: string }): Promise<string> {
     try {
-      const response = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user, packageInfo })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        // Mengambil pesan error spesifik jika ada (misal: "Client ID Not Found")
-        const errorMessage = data.message || "Gagal mendapatkan akses ke gateway pembayaran.";
-        throw new Error(errorMessage);
-      }
-
-      if (data.response?.payment?.url) {
-        return data.response.payment.url;
+      const settings = await StorageService.getPaymentSettings();
+      // Cari paket yang sesuai dengan harga atau nama
+      const pkg = settings.packages.find(p => p.credits === packageInfo.credits && p.isActive);
+      
+      if (pkg && pkg.paymentLink) {
+        return pkg.paymentLink;
       }
       
-      throw new Error("DOKU tidak mengembalikan URL pembayaran. Periksa konfigurasi Merchant Dashboard Anda.");
+      throw new Error("Link pembayaran untuk paket ini belum dikonfigurasi oleh Admin.");
     } catch (error: any) {
-      console.error("Doku Service Client Error:", error.message);
+      console.error("Payment Service Error:", error.message);
       throw error;
     }
   },
