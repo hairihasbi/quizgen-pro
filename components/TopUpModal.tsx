@@ -19,32 +19,38 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ user, onClose, onSuccess }) => 
   useEffect(() => {
     const loadPackages = async () => {
       const settings = await StorageService.getPaymentSettings();
-      setPackages(settings.packages.filter(p => p.isActive));
+      // Hanya tampilkan 3 paket pertama yang aktif
+      setPackages(settings.packages.filter(p => p.isActive).slice(0, 3));
       setIsFetching(false);
     };
     loadPackages();
   }, []);
 
   const handleCheckout = async (pkg: PaymentPackage) => {
+    if (!pkg.paymentLink) {
+      alert("Link pembayaran belum diatur untuk paket ini.");
+      return;
+    }
+
     setLoading(pkg.id);
     setErrorHint(null);
     try {
-      const url = await DokuService.createInvoice(user, { 
-        amount: pkg.price, 
-        credits: pkg.credits,
-        name: pkg.name
-      });
-      onSuccess(url);
+      // Langsung buka link di tab baru
+      window.open(pkg.paymentLink, '_blank');
+      
+      // Berikan instruksi ke user
+      alert("Link pembayaran telah dibuka di tab baru. Silakan selesaikan pembayaran dan konfirmasi ke Admin jika kredit belum bertambah.");
+      
+      onClose();
     } catch (err: any) {
       setErrorHint(err.message);
-      console.error("Topup UI Error:", err);
     } finally {
       setLoading(null);
     }
   };
 
   const getPackageIcon = (index: number) => {
-    const icons = ['🐣', '🚀', '👑', '💎', '🔥', '⚡'];
+    const icons = ['🐣', '🚀', '👑'];
     return icons[index % icons.length];
   };
 
@@ -52,9 +58,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ user, onClose, onSuccess }) => 
     const colors = [
       'from-orange-400 to-orange-500',
       'from-orange-500 to-red-500',
-      'from-purple-500 to-orange-500',
-      'from-blue-500 to-emerald-500',
-      'from-rose-500 to-pink-500'
+      'from-purple-500 to-orange-500'
     ];
     return colors[index % colors.length];
   };
@@ -95,7 +99,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ user, onClose, onSuccess }) => 
               Menghubungkan ke Store...
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {packages.map((pkg, idx) => (
                 <button 
                   key={pkg.id}
@@ -113,26 +117,17 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ user, onClose, onSuccess }) => 
                   </div>
                   <div className="mt-auto pt-4 border-t flex justify-between items-center w-full">
                      <span className="text-sm font-black text-orange-500">Rp {pkg.price.toLocaleString('id-ID')}</span>
-                     {loading === pkg.id ? (
-                        <div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-                     ) : (
-                        <span className="text-xs font-black text-gray-300 group-hover:text-orange-500">BELI ➜</span>
-                     )}
+                     <span className="text-xs font-black text-gray-300 group-hover:text-orange-500">BELI ➜</span>
                   </div>
                 </button>
               ))}
-              {packages.length === 0 && (
-                <div className="col-span-full py-20 text-center text-gray-300 font-black uppercase tracking-widest text-[10px] italic">
-                  Maaf, belum ada paket yang tersedia.
-                </div>
-              )}
             </div>
           )}
 
           <div className="bg-white p-6 rounded-2xl border border-dashed border-gray-200 flex items-center gap-4">
              <div className="text-2xl grayscale">🛡️</div>
              <p className="text-[10px] text-gray-400 font-bold leading-relaxed uppercase tracking-widest">
-                Pembayaran Aman &amp; Terenkripsi via <span className="text-orange-500">DOKU Payment Gateway</span>. Real-time credit injection enabled.
+                Pembayaran via Link Langsung. Setelah pembayaran berhasil, harap hubungi Admin untuk penambahan kredit manual jika sistem otomatis belum aktif.
              </p>
           </div>
         </div>
