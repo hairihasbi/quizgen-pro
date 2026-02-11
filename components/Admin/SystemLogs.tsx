@@ -9,6 +9,7 @@ const SystemLogs: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'error'>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -22,6 +23,25 @@ const SystemLogs: React.FC = () => {
     const data = await StorageService.getLogs();
     setLogs(data);
     setTimeout(() => setIsRefreshing(false), 800);
+  };
+
+  const handleClearLogs = async () => {
+    const confirmClear = window.confirm(
+      "⚠️ PERINGATAN KRITIKAL:\n\nApakah Anda yakin ingin menghapus SELURUH catatan audit trail (logs)? Tindakan ini tidak dapat dibatalkan dan akan membersihkan riwayat aktivitas di database Turso Cloud."
+    );
+
+    if (confirmClear) {
+      setIsClearing(true);
+      try {
+        await StorageService.clearLogs();
+        setLogs([]);
+        alert("System Logs berhasil dibersihkan.");
+      } catch (e) {
+        alert("Gagal membersihkan log.");
+      } finally {
+        setIsClearing(false);
+      }
+    }
   };
 
   const filteredLogs = useMemo(() => {
@@ -67,6 +87,13 @@ const SystemLogs: React.FC = () => {
                </div>
             </div>
             <div className="flex flex-wrap gap-3">
+               <button 
+                 onClick={handleClearLogs} 
+                 disabled={isClearing || logs.length === 0}
+                 className="px-6 py-3 bg-rose-50 text-rose-500 border border-rose-100 font-black rounded-2xl text-[10px] uppercase shadow-sm hover:bg-rose-500 hover:text-white transition-all flex items-center gap-2 disabled:opacity-30"
+               >
+                 {isClearing ? 'Clearing...' : '🗑️ Reset All Logs'}
+               </button>
                <button onClick={fetchLogs} className="px-6 py-3 bg-gray-900 text-white font-black rounded-2xl text-[10px] uppercase shadow-lg hover:bg-orange-600 transition-all flex items-center gap-2">
                  <span className={isRefreshing ? 'animate-spin' : ''}>🔄</span> {isRefreshing ? 'Syncing...' : 'Refresh Logs'}
                </button>
