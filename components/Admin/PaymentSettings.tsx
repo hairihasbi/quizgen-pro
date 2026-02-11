@@ -7,6 +7,7 @@ const PaymentSettingsPanel: React.FC = () => {
   const [settings, setSettings] = useState<PaymentSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [showSecret, setShowSecret] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [envStatus, setEnvStatus] = useState({
     clientIdManaged: false,
     secretKeyManaged: false
@@ -34,17 +35,21 @@ const PaymentSettingsPanel: React.FC = () => {
 
   const loadSettings = async () => {
     const data = await StorageService.getPaymentSettings();
-    // Kunci mode ke production
     setSettings({ ...data, mode: 'production' });
     setLoading(false);
   };
 
   const handleSave = async () => {
     if (!settings) return;
-    const finalSettings = { ...settings, mode: 'production' as const };
-    await StorageService.savePaymentSettings(finalSettings);
-    alert('Konfigurasi DOKU Production Berhasil Disimpan!');
-    loadSettings(); 
+    setIsSaving(true);
+    try {
+      const finalSettings = { ...settings, mode: 'production' as const };
+      await StorageService.savePaymentSettings(finalSettings);
+      alert('Kredensial DOKU Production Berhasil Disimpan!');
+      loadSettings(); 
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleAddPackage = () => {
@@ -89,53 +94,57 @@ const PaymentSettingsPanel: React.FC = () => {
                  <div className="flex items-center gap-2">
                     <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">DOKU Payment Gateway</h2>
                     <span className="bg-emerald-100 text-emerald-600 text-[8px] font-black px-3 py-1 rounded-full uppercase flex items-center gap-1 shadow-sm border border-emerald-200">
-                      PRODUCTION ONLY
+                      LIVE MODE
                     </span>
                  </div>
-                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Status: Live Mode Activated</p>
+                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Status: Production Environment</p>
               </div>
            </div>
-           <button onClick={handleSave} className="px-10 py-4 orange-gradient text-white font-black rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition-all uppercase text-xs tracking-widest">
-             Simpan Kredensial
+           <button 
+             onClick={handleSave} 
+             disabled={isSaving}
+             className="px-10 py-4 orange-gradient text-white font-black rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition-all uppercase text-xs tracking-widest disabled:opacity-50"
+           >
+             {isSaving ? 'Menyimpan...' : 'Simpan Kredensial'}
            </button>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
            <div className="space-y-6">
-              <h3 className="text-xs font-black text-orange-500 uppercase tracking-[0.2em] border-l-4 border-orange-500 pl-4">API Credentials</h3>
+              <h3 className="text-xs font-black text-orange-500 uppercase tracking-[0.2em] border-l-4 border-orange-500 pl-4">Konfigurasi API</h3>
               <div className="space-y-4">
                  <div className="space-y-1">
                     <div className="flex justify-between items-center ml-2">
-                       <label className="text-[10px] font-black text-gray-400 uppercase">Client ID</label>
-                       {envStatus.clientIdManaged && <span className="text-[8px] font-black text-amber-500 uppercase">Managed by ENV</span>}
+                       <label className="text-[10px] font-black text-gray-400 uppercase">Production Client ID</label>
+                       {envStatus.clientIdManaged && <span className="text-[8px] font-black text-amber-500 uppercase">Vercel Managed</span>}
                     </div>
                     <input 
                       type="text" 
                       disabled={envStatus.clientIdManaged}
                       className={`w-full px-6 py-4 rounded-2xl border-2 border-transparent focus:border-orange-500 font-mono text-xs outline-none shadow-inner transition-all ${
-                        envStatus.clientIdManaged ? 'bg-amber-50 text-amber-700 italic cursor-not-allowed' : 'bg-gray-50 text-gray-900'
+                        envStatus.clientIdManaged ? 'bg-amber-50 text-amber-700 italic cursor-not-allowed border-amber-100' : 'bg-gray-50 text-gray-900'
                       }`} 
                       value={envStatus.clientIdManaged ? 'managed_by_environment_variable' : settings.clientId}
                       onChange={e => setSettings({...settings, clientId: e.target.value})}
-                      placeholder="Input ID Production"
+                      placeholder="Input ID Production (misal: CID-xxx)"
                     />
                  </div>
                  <div className="space-y-1">
                     <div className="flex justify-between items-center ml-2">
-                       <label className="text-[10px] font-black text-gray-400 uppercase">Secret Key</label>
-                       {envStatus.secretKeyManaged && <span className="text-[8px] font-black text-amber-500 uppercase">Managed by ENV</span>}
+                       <label className="text-[10px] font-black text-gray-400 uppercase">Production Secret Key</label>
+                       {envStatus.secretKeyManaged && <span className="text-[8px] font-black text-amber-500 uppercase">Vercel Managed</span>}
                     </div>
                     <div className="relative">
                       <input 
                         type={showSecret ? 'text' : 'password'} 
                         disabled={envStatus.secretKeyManaged}
                         className={`w-full px-6 py-4 rounded-2xl border-2 border-transparent focus:border-orange-500 font-mono text-xs outline-none shadow-inner transition-all ${
-                          envStatus.secretKeyManaged ? 'bg-amber-50 text-amber-700 italic cursor-not-allowed' : 
+                          envStatus.secretKeyManaged ? 'bg-amber-50 text-amber-700 italic cursor-not-allowed border-amber-100' : 
                           settings.secretKey.includes('•') ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-50 text-gray-900'
                         }`}
                         value={envStatus.secretKeyManaged ? 'managed_by_environment_variable' : settings.secretKey}
                         onChange={e => setSettings({...settings, secretKey: e.target.value})}
-                        placeholder="Input Key Production"
+                        placeholder="Input Secret Key Production (misal: SK-xxx)"
                       />
                       {!envStatus.secretKeyManaged && (
                         <button 
@@ -146,22 +155,24 @@ const PaymentSettingsPanel: React.FC = () => {
                         </button>
                       )}
                     </div>
-                    <p className="text-[8px] text-gray-400 font-bold uppercase mt-2 px-2 leading-relaxed">
-                      Gunakan kredensial <strong>Production</strong> dari Dashboard DOKU. Mode Sandbox telah dihapus untuk mencegah error transaksi.
-                    </p>
+                    <div className="p-4 bg-orange-50 rounded-2xl border border-orange-100 mt-4">
+                       <p className="text-[9px] text-orange-600 font-bold uppercase leading-relaxed">
+                         💡 <strong>PENTING:</strong> Pastikan Anda menyalin kredensial dari tab <strong>"Production"</strong> di dashboard DOKU. Jika Anda menggunakan kredensial Sandbox di endpoint Production, transaksi akan selalu gagal (HTTP 500/401).
+                       </p>
+                    </div>
                  </div>
               </div>
            </div>
 
            <div className="space-y-6">
-              <h3 className="text-xs font-black text-orange-500 uppercase tracking-[0.2em] border-l-4 border-orange-500 pl-4">Webhook & Notifications</h3>
+              <h3 className="text-xs font-black text-orange-500 uppercase tracking-[0.2em] border-l-4 border-orange-500 pl-4">Notification Webhook</h3>
               <div className="p-8 bg-gray-900 rounded-[2.5rem] border border-gray-800 text-white space-y-6">
                  <div className="flex items-center gap-4 border-b border-white/10 pb-4">
                     <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-xl">🚀</div>
-                    <div className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Production Webhook URL</div>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Live URL</div>
                  </div>
                  <div className="space-y-2">
-                    <p className="text-[10px] text-gray-400 font-bold leading-relaxed">Copy URL ini ke "Notification URL" di Dashboard DOKU Merchant:</p>
+                    <p className="text-[10px] text-gray-400 font-bold leading-relaxed">Daftarkan URL di bawah ini pada menu "Notification URL" di Dashboard Merchant DOKU Anda:</p>
                     <div className="bg-white/5 p-4 rounded-xl border border-white/10 font-mono text-[10px] break-all select-all text-orange-300 cursor-copy" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/api/webhook`); alert("URL copied!"); }}>
                        {window.location.origin}/api/webhook
                     </div>
@@ -173,7 +184,7 @@ const PaymentSettingsPanel: React.FC = () => {
 
       <div className="bg-white rounded-[3rem] border shadow-sm p-10 space-y-8">
          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <h3 className="text-xs font-black text-orange-500 uppercase tracking-[0.3em] border-l-4 border-orange-500 pl-4">Daftar Paket Top Up</h3>
+            <h3 className="text-xs font-black text-orange-500 uppercase tracking-[0.3em] border-l-4 border-orange-500 pl-4">Paket Kredit (Live)</h3>
             <button 
               onClick={handleAddPackage}
               className="px-8 py-3 bg-gray-100 text-gray-500 font-black rounded-xl text-[10px] uppercase hover:bg-orange-500 hover:text-white transition-all shadow-sm active:scale-95"
@@ -196,16 +207,16 @@ const PaymentSettingsPanel: React.FC = () => {
                  </div>
                  <div className="space-y-4">
                     <div className="space-y-1">
-                       <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Nama Paket</label>
+                       <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Label Produk</label>
                        <input type="text" className="w-full px-4 py-2.5 rounded-xl border bg-white font-bold text-sm outline-none focus:border-orange-500 shadow-sm" value={pkg.name} onChange={e => updatePackage(pkg.id, 'name', e.target.value)} />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-1">
-                          <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Kredit</label>
+                          <label className="text-[9px] font-black text-gray-400 uppercase ml-1">AI Credits</label>
                           <input type="number" className="w-full px-4 py-2.5 rounded-xl border bg-white font-bold text-sm outline-none focus:border-orange-500 shadow-sm" value={pkg.credits} onChange={e => updatePackage(pkg.id, 'credits', parseInt(e.target.value) || 0)} />
                        </div>
                        <div className="space-y-1">
-                          <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Harga (Rp)</label>
+                          <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Price (IDR)</label>
                           <input type="number" className="w-full px-4 py-2.5 rounded-xl border bg-white font-bold text-sm outline-none focus:border-orange-500 shadow-sm" value={pkg.price} onChange={e => updatePackage(pkg.id, 'price', parseInt(e.target.value) || 0)} />
                        </div>
                     </div>
