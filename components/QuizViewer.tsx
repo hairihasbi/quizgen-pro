@@ -1,8 +1,6 @@
 
-import React, { useEffect, useState } from 'react';
-import { Quiz } from '../types';
-import { GoogleFormsService } from '../services/googleFormsService';
-import { GoogleDocsService } from '../services/googleDocsService';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Quiz, QuestionType, Question } from '../types';
 
 interface QuizViewerProps {
   quiz: Quiz;
@@ -12,255 +10,283 @@ interface QuizViewerProps {
 const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
   const [showAnswer, setShowAnswer] = useState(false);
   const [exportMode, setExportMode] = useState<'soal' | 'kisi-kisi' | 'lengkap'>('soal');
-  const [isExporting, setIsExporting] = useState(false);
-  const [isExportingDocs, setIsExportingDocs] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isClientExporting, setIsClientExporting] = useState(false);
 
-  // Efek khusus untuk registrasi MathJax Observer
+  // 1. Urutkan soal berdasarkan urutan tipe standar agar penomoran tidak loncat
+  const sortedQuestions = useMemo(() => {
+    const typeOrder = [
+      QuestionType.MCQ,
+      QuestionType.COMPLEX_MCQ,
+      QuestionType.TRUE_FALSE,
+      QuestionType.SHORT_ANSWER,
+      QuestionType.ESSAY
+    ];
+    return [...quiz.questions].sort((a, b) => {
+      return typeOrder.indexOf(a.type) - typeOrder.indexOf(b.type);
+    });
+  }, [quiz.questions]);
+
+  // 2. Kelompokkan soal yang sudah diurutkan
+  const groupedQuestions = useMemo(() => {
+    const groups: Record<string, Question[]> = {};
+    sortedQuestions.forEach(q => {
+      if (!groups[q.type]) groups[q.type] = [];
+      groups[q.type].push(q);
+    });
+    return groups;
+  }, [sortedQuestions]);
+
+  const getCognitiveLevelLabel = (level: string) => {
+    const l = level.toUpperCase();
+    if (l.includes('C1') || l.includes('C2')) return 'L1';
+    if (l.includes('C3')) return 'L2';
+    if (l.includes('C4') || l.includes('C5') || l.includes('C6')) return 'L3 (HOTS)';
+    return level;
+  };
+
+  const triggerMathJax = async (elementId: string) => {
+    const el = document.getElementById(elementId);
+    if (el && (window as any).MathJax && (window as any).MathJax.typesetPromise) {
+      try {
+        await (window as any).MathJax.typesetPromise([el]);
+      } catch (err) {
+        console.warn("MathJax typeset failed", err);
+      }
+    }
+  };
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      if ((window as any).observeMathItems) {
-        (window as any).observeMathItems('quiz-print-area');
-      }
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [quiz, showAnswer, exportMode]);
-
-  const sanitizeHTML = (html: string) => {
-    if (!html || html === 'null') return "";
-    return html
-      .replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gmi, "")
-      .replace(/\s+on\w+\s*=\s*(['"])(.*?)\1/gmi, "")
-      .replace(/href\s*=\s*(['"])javascript:.*?\1/gmi, "");
-  };
-
-  const getFontClass = (subject: string) => {
-    const s = subject.toLowerCase();
-    if (s.includes('arab')) return 'font-arabic text-right';
-    if (s.includes('jepang')) return 'font-jp';
-    if (s.includes('korea')) return 'font-kr';
-    if (s.includes('mandarin')) return 'font-zh';
-    return '';
-  };
-
-  const getCognitiveLevelMapping = (levelStr: string) => {
-    if (!levelStr) return "-";
-    const l = levelStr.toUpperCase();
-    if (l.includes('C1') || l.includes('C2')) return "Level 1";
-    if (l.includes('C3')) return "Level 2";
-    if (l.includes('C4') || l.includes('C5') || l.includes('C6')) return "Level 3";
-    return levelStr;
-  };
-
-  const handleNativePrint = async () => {
-    // Untuk print, kita butuh typeset SEMUA dulu agar tidak ada LaTeX mentah yang tercetak
-    if ((window as any).MathJax && (window as any).MathJax.typesetPromise) {
-        const items = document.querySelectorAll('.mjx-item');
-        await (window as any).MathJax.typesetPromise(Array.from(items));
-    }
-    setTimeout(() => {
-        window.print();
+      triggerMathJax('quiz-print-area');
     }, 300);
-  };
+    return () => clearTimeout(timer);
+  }, [quiz, showAnswer, exportMode, sortedQuestions]);
 
-  const handleExportToGoogleForms = async () => {
-    setIsExporting(true);
+  const handleExportPdfClient = async () => {
+    const element = document.getElementById('quiz-print-area');
+    if (!element || !(window as any).html2pdf) {
+      alert("Library PDF belum siap.");
+      return;
+    }
+
+    setIsClientExporting(true);
+    await new Promise(r => setTimeout(r, 600));
+    await triggerMathJax('quiz-print-area');
+    
+    const opt = {
+      margin: 10,
+      filename: `${exportMode.toUpperCase()}_${quiz.title.replace(/\s+/g, '_')}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: exportMode === 'kisi-kisi' ? 'landscape' : 'portrait' },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+
     try {
-      const formUrl = await GoogleFormsService.exportToForms(quiz);
-      window.open(formUrl, '_blank');
-      alert("Berhasil! Kuis draf Anda telah dibuat di Google Forms.");
+      await (window as any).html2pdf().set(opt).from(element).save();
     } catch (err: any) {
-      alert("Gagal ekspor ke Google Forms: " + err.message);
+      alert("Gagal export: " + err.message);
     } finally {
-      setIsExporting(false);
+      setIsClientExporting(false);
     }
   };
 
-  const handleExportToGoogleDocs = async () => {
-    setIsExportingDocs(true);
+  const handleDownloadPdfSSR = async () => {
+    setIsDownloading(true);
     try {
-      const docUrl = await GoogleDocsService.exportToDocs(quiz);
-      window.open(docUrl, '_blank');
-      alert("Berhasil! Dokumen draf soal telah dibuat di Google Docs.");
+      const response = await fetch('/api/generate-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          quiz: { ...quiz, questions: sortedQuestions }, // Kirim yang sudah sorted
+          showAnswer: exportMode === 'lengkap' || showAnswer,
+          mode: exportMode
+        })
+      });
+
+      if (!response.ok) throw new Error("Gagal generate PDF di server.");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${exportMode.toUpperCase()}_${quiz.title.replace(/\s+/g, '_')}_Server.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
     } catch (err: any) {
-      alert("Gagal ekspor ke Google Docs: " + err.message);
+      alert("Error Server: " + err.message);
     } finally {
-      setIsExportingDocs(false);
+      setIsDownloading(false);
     }
   };
+
+  // Variable untuk melacak nomor urut global saat mapping
+  let globalIndex = 0;
 
   return (
-    <div className="fixed inset-0 bg-orange-50/95 backdrop-blur-2xl z-[500] flex flex-col p-4 md:p-8 animate-in zoom-in-95 duration-300 print:p-0 print:bg-white print:static print:overflow-visible" role="dialog" aria-labelledby="viewer-quiz-title">
+    <div className="fixed inset-0 bg-orange-50/98 backdrop-blur-3xl z-[500] flex flex-col p-4 md:p-8 animate-in zoom-in-95 duration-300 print-modal-wrapper" role="dialog">
       
-      <header className="flex flex-col lg:flex-row justify-between items-center bg-white p-5 rounded-[2.5rem] shadow-xl shadow-orange-100/50 mb-6 border border-orange-100 gap-4 no-print text-gray-900">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 orange-gradient rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg" aria-hidden="true">📄</div>
+      <header className="flex flex-col lg:flex-row justify-between items-center bg-white p-6 rounded-[2.5rem] shadow-2xl shadow-orange-100/50 mb-8 border border-orange-100 gap-6 no-print">
+        <div className="flex items-center gap-5">
+          <div className="w-14 h-14 orange-gradient rounded-2xl flex items-center justify-center text-white text-3xl shadow-lg">📄</div>
           <div>
-            <h2 id="viewer-quiz-title" className="font-black text-gray-800 uppercase text-[10px] tracking-tight truncate max-w-[220px]">{quiz.title}</h2>
-            <div className="text-[8px] font-bold text-orange-500 uppercase mt-1">Preview Mode: {exportMode}</div>
+            <h2 className="font-black text-gray-800 uppercase text-xs tracking-tight truncate max-w-[280px]">{quiz.title}</h2>
+            <div className="text-[9px] font-black text-orange-500 uppercase mt-1 tracking-widest">TAMPILAN: {exportMode.toUpperCase()}</div>
           </div>
         </div>
         
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <div className="flex gap-1 bg-orange-50 p-1 rounded-2xl border border-orange-100" role="group">
-             <button 
-              onClick={() => { setExportMode('soal'); setShowAnswer(false); }} 
-              className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all outline-none ${exportMode === 'soal' ? 'bg-white text-orange-600 shadow-sm' : 'text-orange-300'}`}
-             >SOAL</button>
-             <button 
-              onClick={() => { setExportMode('kisi-kisi'); setShowAnswer(false); }} 
-              className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all outline-none ${exportMode === 'kisi-kisi' ? 'bg-white text-orange-600 shadow-sm' : 'text-orange-300'}`}
-             >KISI-KISI</button>
-             <button 
-              onClick={() => { setExportMode('lengkap'); setShowAnswer(true); }} 
-              className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all outline-none ${exportMode === 'lengkap' ? 'bg-white text-orange-600 shadow-sm' : 'text-orange-300'}`}
-             >LENGKAP</button>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <div className="flex gap-1 bg-orange-50 p-1.5 rounded-2xl border border-orange-100">
+             <button onClick={() => { setExportMode('soal'); setShowAnswer(false); }} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all ${exportMode === 'soal' ? 'bg-white text-orange-600 shadow-md' : 'text-orange-300 hover:text-orange-400'}`}>BUTIR SOAL</button>
+             <button onClick={() => { setExportMode('kisi-kisi'); setShowAnswer(false); }} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all ${exportMode === 'kisi-kisi' ? 'bg-white text-orange-600 shadow-md' : 'text-orange-300 hover:text-orange-400'}`}>MATRIKS KISI-KISI</button>
+             <button onClick={() => { setExportMode('lengkap'); setShowAnswer(true); }} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all ${exportMode === 'lengkap' ? 'bg-white text-orange-600 shadow-md' : 'text-orange-300 hover:text-orange-400'}`}>KUNCI JAWABAN</button>
           </div>
           
-          <button 
-            onClick={handleExportToGoogleDocs}
-            disabled={isExportingDocs}
-            className="px-6 py-3 bg-[#4285f4] text-white rounded-2xl text-[10px] font-black hover:scale-105 transition-all shadow-xl uppercase outline-none focus:ring-4 focus:ring-blue-300 flex items-center gap-2"
-          >
-            {isExportingDocs ? 'Saving...' : '📄 Ke Google Doc'}
+          <button onClick={handleExportPdfClient} disabled={isClientExporting} className="px-8 py-4 bg-orange-600 text-white rounded-2xl text-[10px] font-black shadow-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-50">
+            {isClientExporting ? "⏳..." : "📥 PDF (Instan)"}
           </button>
 
-          <button 
-            onClick={handleExportToGoogleForms}
-            disabled={isExporting}
-            className="px-6 py-3 bg-[#673ab7] text-white rounded-2xl text-[10px] font-black hover:scale-105 transition-all shadow-xl uppercase outline-none focus:ring-4 focus:ring-purple-300 flex items-center gap-2"
-          >
-            {isExporting ? 'Exporting...' : '📝 Ke Google Form'}
+          <button onClick={handleDownloadPdfSSR} disabled={isDownloading} className="px-8 py-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black shadow-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-50">
+            {isDownloading ? "☁️..." : "☁️ PDF (Engine)"}
           </button>
 
-          <button 
-            onClick={handleNativePrint} 
-            className="px-6 py-3 orange-gradient text-white rounded-2xl text-[10px] font-black hover:scale-105 transition-all shadow-xl uppercase outline-none focus:ring-4 focus:ring-orange-300"
-          >
-            🖨️ Cetak / PDF
-          </button>
-          
-          <button 
-            onClick={onClose} 
-            className="w-10 h-10 flex items-center justify-center text-orange-300 hover:text-red-500 font-black bg-orange-100/50 rounded-full outline-none"
-          >✕</button>
+          <button onClick={onClose} className="w-12 h-12 flex items-center justify-center text-orange-300 hover:text-red-500 bg-orange-100/50 rounded-full transition-colors font-bold">✕</button>
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-10 flex justify-center custom-scrollbar bg-orange-100/20 rounded-[3rem] print:bg-white print:p-0 print:overflow-visible">
-        <div id="quiz-print-area" className="print-container bg-white shadow-2xl transition-all duration-500 text-gray-900 w-full md:w-[210mm] min-h-screen py-[15mm] print:shadow-none print:w-full print:py-0">
+      <div className="flex-1 overflow-y-auto p-0 md:p-12 flex justify-center custom-scrollbar print-scroll-container">
+        <div id="quiz-print-area" className={`print-container bg-white text-gray-900 shadow-none border-none ${exportMode === 'kisi-kisi' ? 'landscape-mode' : ''}`}>
           
-          <div className="print-watermark">GENZ QUIZGEN PRO</div>
+          <div className="text-center mb-1">
+            <h1 className="text-xl font-black m-0 uppercase">NASKAH SOAL EVALUASI HASIL BELAJAR</h1>
+            <h2 className="text-lg font-bold m-0 uppercase">{quiz.subject} - {quiz.grade}</h2>
+            <p className="text-[9pt] font-medium text-gray-400 mt-1 uppercase tracking-widest">Kurikulum Merdeka • {quiz.level}</p>
+          </div>
+          
+          <div className="border-t-[3px] border-b border-black h-[5px] mb-6"></div>
 
-          <div className="pdf-block px-[20mm] mb-6 print:px-0">
-             <div className="border-b-4 border-double border-gray-900 pb-4 mb-6 text-center">
-                <h1 className="text-2xl font-black uppercase tracking-tight text-gray-900">{quiz.title}</h1>
-                <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-gray-600 mt-1">
-                   {quiz.subject} | {quiz.level} {quiz.grade}
-                </div>
-             </div>
-
-             <div className="grid grid-cols-2 gap-x-12 gap-y-4 p-6 border-2 border-gray-900 rounded-2xl bg-gray-50/30 print:bg-white">
-                <div className="flex items-center gap-3">
-                   <span className="w-20 shrink-0 font-black text-[11px] text-gray-500 uppercase">NAMA</span>
-                   <span className="font-black text-gray-900">:</span>
-                   <div className="flex-1 border-b-2 border-dotted border-gray-300 h-5"></div>
-                </div>
-                <div className="flex items-center gap-3">
-                   <span className="w-20 shrink-0 font-black text-[11px] text-gray-500 uppercase">HARI / TGL</span>
-                   <span className="font-black text-gray-900">:</span>
-                   <div className="flex-1 border-b-2 border-dotted border-gray-300 h-5"></div>
-                </div>
-                <div className="flex items-center gap-3">
-                   <span className="w-20 shrink-0 font-black text-[11px] text-gray-500 uppercase">KELAS</span>
-                   <span className="font-black text-gray-900">:</span>
-                   <div className="flex-1 border-b-2 border-dotted border-gray-300 h-5"></div>
-                </div>
-                <div className="flex items-center gap-3">
-                   <span className="w-20 shrink-0 font-black text-[11px] text-gray-500 uppercase">NO. ABSEN</span>
-                   <span className="font-black text-gray-900">:</span>
-                   <div className="flex-1 border-b-2 border-dotted border-gray-300 h-5"></div>
-                </div>
-             </div>
+          <div className="mb-10">
+            <table className="w-full border-collapse text-[10.5pt]">
+              <tbody>
+                <tr>
+                  <td className="w-32 py-1 font-bold">Nama Siswa</td><td className="w-4 py-1 text-center">:</td>
+                  <td className="py-1 border-b border-gray-300 italic text-gray-300">......................................................................</td>
+                  <td className="w-32 py-1 font-bold text-right">Hari / Tanggal</td><td className="w-4 py-1 text-center">:</td>
+                  <td className="w-44 py-1 border-b border-gray-300 italic text-gray-300">..............................</td>
+                </tr>
+                <tr>
+                  <td className="py-1 font-bold">Kelas / No. Absen</td><td className="py-1 text-center">:</td>
+                  <td className="py-1 border-b border-gray-300 italic text-gray-300">......................................................................</td>
+                  <td className="py-1 font-bold text-right">Waktu Ujian</td><td className="py-1 text-center">:</td>
+                  <td className="py-1 border-b border-gray-300 italic text-gray-300">90 Menit</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
-          <div>
-            {(exportMode === 'soal' || exportMode === 'lengkap') && (
-              <div className="px-[20mm] print:px-0 space-y-0">
-                {quiz.questions.map((q, i) => {
-                  const isNewPassage = q.passage && (i === 0 || quiz.questions[i-1].passage !== q.passage);
-                  const isNewType = i === 0 || quiz.questions[i-1].type !== q.type;
-                  
-                  return (
-                    <div key={q.id} className="mjx-item math-loading pdf-block py-6 border-b border-gray-100 print:border-gray-200">
-                        {isNewType && (
-                          <div className="mb-6 mt-4 no-print-bg">
-                            <h3 className="text-[11px] font-black text-gray-900 uppercase tracking-[0.15em] border-l-4 border-gray-900 pl-3">
-                              BAGIAN: {q.type.toUpperCase()}
-                            </h3>
-                          </div>
-                        )}
-                        {isNewPassage && (
-                          <div className="mb-4 bg-gray-50 rounded-2xl border-l-4 border-orange-400 p-5 italic text-gray-700 text-[13px] text-justify print:bg-white print:border-gray-300" dangerouslySetInnerHTML={{ __html: sanitizeHTML(q.passage!) }}></div>
-                        )}
-                        <div className="flex gap-4 items-start">
-                          <span className="font-black text-gray-900 text-[14px] mt-0.5 w-8 shrink-0">{i + 1}.</span>
-                          <div className="flex-1">
-                            <div className={`text-gray-900 font-bold leading-relaxed text-[14px] text-justify pb-4 ${getFontClass(quiz.subject)}`} dangerouslySetInnerHTML={{ __html: sanitizeHTML(q.text) }}></div>
-                            {q.options && (
-                              <div className="options-grid">
-                                {q.options.map(opt => (
-                                  <div key={opt.label} className="flex gap-3 items-start">
-                                    <span className="font-black text-gray-900 w-7 h-7 flex items-center justify-center rounded-lg border border-gray-400 text-[11px] shrink-0">{opt.label}</span>
-                                    <div className={`font-semibold text-gray-800 text-[13px] pt-1 ${getFontClass(quiz.subject)}`} dangerouslySetInnerHTML={{ __html: sanitizeHTML(opt.text) }}></div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {showAnswer && (
-                              <div className="mt-4 p-5 bg-emerald-50 rounded-2xl border border-emerald-100 print:bg-white print:border-gray-300">
-                                <div className="text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-1 print:text-black">Kunci: {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</div>
-                                <div className={`text-[12px] text-gray-600 italic ${getFontClass(quiz.subject)}`} dangerouslySetInnerHTML={{ __html: sanitizeHTML(q.explanation) }}></div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {exportMode === 'kisi-kisi' && (
-              <div className="px-[10mm] print:px-0 pdf-block">
-                <h3 className="text-lg font-black text-gray-900 uppercase border-b-2 border-gray-900 mb-6 pb-2 text-center">Matriks Kisi-kisi Instrumen Penilaian</h3>
-                <table className="w-full border-collapse border-2 border-gray-900 text-[10px]">
+          <div className="space-y-8">
+            {exportMode === 'kisi-kisi' ? (
+              <>
+                <div className="text-[11pt] font-black underline uppercase mb-6 text-center">MATRIKS KISI-KISI PENULISAN SOAL</div>
+                <table className="w-full border-collapse border-2 border-black text-[8.5pt]">
                   <thead>
-                    <tr className="bg-gray-100 print:bg-gray-50">
-                      <th className="border border-gray-900 p-2 w-8 text-center font-black">No</th>
-                      <th className="border border-gray-900 p-2 text-center w-40 font-black">KD / TP</th>
-                      <th className="border border-gray-900 p-2 text-center w-32 font-black">Materi</th>
-                      <th className="border border-gray-900 p-2 text-center font-black">Indikator Soal</th>
-                      <th className="border border-gray-900 p-2 w-16 text-center font-black">Level</th>
-                      <th className="border border-gray-900 p-2 w-20 text-center font-black">Bentuk</th>
-                      <th className="border border-gray-900 p-2 w-12 text-center font-black">No</th>
+                    <tr className="bg-gray-100">
+                      <th className="border-2 border-black p-2 w-8 text-center">NO</th>
+                      <th className="border-2 border-black p-2 w-48 text-left uppercase">CAPAIAN PEMBELAJARAN / KD</th>
+                      <th className="border-2 border-black p-2 w-32 text-left uppercase">MATERI POKOK</th>
+                      <th className="border-2 border-black p-2 text-left uppercase">INDIKATOR SOAL</th>
+                      <th className="border-2 border-black p-2 w-20 text-center uppercase">LEVEL</th>
+                      <th className="border-2 border-black p-2 w-24 text-center uppercase">BENTUK</th>
+                      <th className="border-2 border-black p-2 w-12 text-center uppercase">NO</th>
+                      <th className="border-2 border-black p-2 w-16 text-center uppercase">KUNCI</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {quiz.questions.map((q, i) => (
+                    {sortedQuestions.map((q, i) => (
                       <tr key={q.id}>
-                        <td className="border border-gray-900 p-2 text-center font-bold">{i + 1}</td>
-                        <td className="border border-gray-900 p-2 text-justify leading-tight">{q.competency || "-"}</td>
-                        <td className="border border-gray-900 p-2 text-center leading-tight">{q.topic || "-"}</td>
-                        <td className="mjx-item math-loading border border-gray-900 p-2 text-justify leading-relaxed">{q.indicator}</td>
-                        <td className="border border-gray-900 p-2 text-center whitespace-nowrap">{getCognitiveLevelMapping(q.cognitiveLevel)}</td>
-                        <td className="border border-gray-900 p-2 text-center">{q.type}</td>
-                        <td className="border border-gray-900 p-2 text-center font-black">{i + 1}</td>
+                        <td className="border-2 border-black p-2 text-center font-bold">{i + 1}</td>
+                        <td className="border-2 border-black p-2 align-top text-justify">
+                          {q.competency || `Menguasai standar kompetensi pada topik ${q.topic || quiz.topic}`}
+                        </td>
+                        <td className="border-2 border-black p-2 align-top font-bold">{q.topic || quiz.topic}</td>
+                        <td className="border-2 border-black p-2 align-top text-justify">
+                          <div dangerouslySetInnerHTML={{ __html: q.indicator }}></div>
+                        </td>
+                        <td className="border-2 border-black p-2 text-center font-bold">{getCognitiveLevelLabel(q.cognitiveLevel).split(' ')[0]}</td>
+                        <td className="border-2 border-black p-2 text-center text-[8pt] uppercase">{q.type}</td>
+                        <td className="border-2 border-black p-2 text-center font-bold">{i + 1}</td>
+                        <td className="border-2 border-black p-2 text-center font-bold uppercase text-orange-600">
+                          {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </>
+            ) : (
+              Object.entries(groupedQuestions).map(([type, questions], gIdx) => (
+                <div key={type} className="space-y-6">
+                  <div className="bg-gray-100 px-6 py-2 border-y-2 border-black font-black text-[11pt] uppercase tracking-tighter">
+                    {String.fromCharCode(65 + gIdx)}. {type}
+                  </div>
+                  
+                  <div className="space-y-8">
+                    {questions.map((q, i) => {
+                      globalIndex++; // Tambah counter global setiap butir soal
+                      const isNewPassage = q.passage && (i === 0 || questions[i-1].passage !== q.passage);
+                      
+                      return (
+                        <div key={q.id} className="pdf-block" style={{ pageBreakInside: 'avoid' }}>
+                          {isNewPassage && (
+                            <div className="bg-gray-50 border-2 border-black p-5 mb-6 italic text-[10.5pt] text-justify leading-relaxed relative">
+                              <div className="absolute top-0 left-4 -translate-y-1/2 bg-white px-2 text-[8pt] font-black uppercase border border-black tracking-widest">WACANA STIMULUS</div>
+                              <div dangerouslySetInnerHTML={{ __html: q.passage! }}></div>
+                            </div>
+                          )}
+                          <div className="flex gap-4 text-[11pt] leading-relaxed">
+                            <div className="font-bold w-6 shrink-0 text-right">{globalIndex}.</div>
+                            <div className="flex-1">
+                              <div className="mb-3 text-justify" dangerouslySetInnerHTML={{ __html: q.text }}></div>
+                              
+                              {q.options && q.options.length > 0 && (
+                                <div className="grid grid-cols-2 gap-x-10 gap-y-1 mb-4 ml-1">
+                                  {q.options.map(opt => (
+                                    <div key={opt.label} className="flex gap-2.5 items-start">
+                                      <span className="font-bold w-4 shrink-0">{opt.label}.</span>
+                                      <span className="text-justify" dangerouslySetInnerHTML={{ __html: opt.text }}></span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {(exportMode === 'lengkap' || showAnswer) && (
+                                <div className="bg-emerald-50 border-2 border-emerald-200 p-5 rounded-3xl text-[9.5pt] italic mt-4 shadow-sm">
+                                  <div className="flex items-center gap-3 mb-2">
+                                     <span className="bg-emerald-600 text-white px-3 py-1 rounded-full text-[8pt] font-black not-italic uppercase tracking-widest">KUNCI: {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</span>
+                                  </div>
+                                  <div className="text-emerald-800 leading-relaxed" dangerouslySetInnerHTML={{ __html: q.explanation }}></div>
+                                </div>
+                              )}
+                              
+                              {exportMode === 'soal' && !showAnswer && type !== 'Pilihan Ganda' && (
+                                <div className="border-b border-dotted border-gray-300 h-16 w-full mt-4 opacity-30"></div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))
             )}
+          </div>
+          
+          <div className="mt-16 pt-4 border-t border-gray-100 text-[8pt] text-gray-400 italic flex justify-between no-print">
+            <span>GenZ QuizGen Pro - AI Powered Engine v3.1</span>
+            <span>Ref ID: {quiz.id.substring(0,8).toUpperCase()}</span>
           </div>
         </div>
       </div>
