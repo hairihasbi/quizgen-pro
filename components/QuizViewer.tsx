@@ -1,19 +1,26 @@
-
 import React, { useEffect, useState, useMemo } from 'react';
 import { Quiz, QuestionType, Question } from '../types';
+import * as docx from 'docx';
+import html2canvas from 'html2canvas';
+import { GoogleFormsService } from '../services/googleFormsService';
+import { GoogleDocsService } from '../services/googleDocsService';
 
 interface QuizViewerProps {
   quiz: Quiz;
   onClose: () => void;
 }
 
+type ExportDocxStatus = 'idle' | 'menyiapkan_engine' | 'menangkap_rumus' | 'menyusun_docx';
+
 const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
   const [showAnswer, setShowAnswer] = useState(false);
   const [exportMode, setExportMode] = useState<'soal' | 'kisi-kisi' | 'lengkap'>('soal');
   const [isDownloading, setIsDownloading] = useState(false);
   const [isClientExporting, setIsClientExporting] = useState(false);
+  const [exportDocxStatus, setExportDocxStatus] = useState<ExportDocxStatus>('idle');
+  const [isExportingForms, setIsExportingForms] = useState(false);
+  const [isExportingDocs, setIsExportingDocs] = useState(false);
 
-  // 1. Urutkan soal berdasarkan urutan tipe standar agar penomoran tidak loncat
   const sortedQuestions = useMemo(() => {
     const typeOrder = [
       QuestionType.MCQ,
@@ -27,7 +34,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
     });
   }, [quiz.questions]);
 
-  // 2. Kelompokkan soal yang sudah diurutkan
   const groupedQuestions = useMemo(() => {
     const groups: Record<string, Question[]> = {};
     sortedQuestions.forEach(q => {
@@ -63,6 +69,30 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
     return () => clearTimeout(timer);
   }, [quiz, showAnswer, exportMode, sortedQuestions]);
 
+  const handleExportGoogleForms = async () => {
+    setIsExportingForms(true);
+    try {
+      const url = await GoogleFormsService.exportToForms({ ...quiz, questions: sortedQuestions });
+      window.open(url, '_blank');
+    } catch (err: any) {
+      alert("Gagal ekspor ke Google Forms: " + err.message);
+    } finally {
+      setIsExportingForms(false);
+    }
+  };
+
+  const handleExportGoogleDocs = async () => {
+    setIsExportingDocs(true);
+    try {
+      const url = await GoogleDocsService.exportToDocs({ ...quiz, questions: sortedQuestions });
+      window.open(url, '_blank');
+    } catch (err: any) {
+      alert("Gagal ekspor ke Google Docs: " + err.message);
+    } finally {
+      setIsExportingDocs(false);
+    }
+  };
+
   const handleExportPdfClient = async () => {
     const element = document.getElementById('quiz-print-area');
     if (!element || !(window as any).html2pdf) {
@@ -71,22 +101,37 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
     }
 
     setIsClientExporting(true);
-    await new Promise(r => setTimeout(r, 600));
+    
+    // Pastikan MathJax sudah ter-render sempurna
     await triggerMathJax('quiz-print-area');
+    await new Promise(r => setTimeout(r, 800));
+    
+    const isLandscape = exportMode === 'kisi-kisi';
     
     const opt = {
-      margin: 10,
-      filename: `${exportMode.toUpperCase()}_${quiz.title.replace(/\s+/g, '_')}.pdf`,
+      margin: 0,
+      filename: `${exportMode.toUpperCase()}_${quiz.title.replace(/\s+/g, '_')}_Instan.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: exportMode === 'kisi-kisi' ? 'landscape' : 'portrait' },
+      html2canvas: { 
+        scale: 2, 
+        useCORS: true, 
+        letterRendering: true,
+        scrollY: 0, // PENTING: Mencegah offset pada halaman bank soal yang panjang
+        scrollX: 0,
+        windowWidth: isLandscape ? 1200 : 800 // Kunci lebar window virtual
+      },
+      jsPDF: { 
+        unit: 'mm', 
+        format: 'a4', 
+        orientation: isLandscape ? 'landscape' : 'portrait' 
+      },
       pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
     };
 
     try {
       await (window as any).html2pdf().set(opt).from(element).save();
     } catch (err: any) {
-      alert("Gagal export: " + err.message);
+      alert("Gagal export PDF Instan: " + err.message);
     } finally {
       setIsClientExporting(false);
     }
@@ -99,19 +144,17 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          quiz: { ...quiz, questions: sortedQuestions }, // Kirim yang sudah sorted
+          quiz: { ...quiz, questions: sortedQuestions },
           showAnswer: exportMode === 'lengkap' || showAnswer,
           mode: exportMode
         })
       });
-
       if (!response.ok) throw new Error("Gagal generate PDF di server.");
-
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${exportMode.toUpperCase()}_${quiz.title.replace(/\s+/g, '_')}_Server.pdf`;
+      a.download = `${exportMode.toUpperCase()}_${quiz.title.replace(/\s+/g, '_')}_Cloud.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -122,12 +165,93 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
     }
   };
 
-  // Variable untuk melacak nomor urut global saat mapping
-  let globalIndex = 0;
+  const handleExportDocx = async () => {
+    const area = document.getElementById('quiz-print-area');
+    if (!area) return;
+    setExportDocxStatus('menyiapkan_engine');
+    try {
+      if ((window as any).MathJax && (window as any).MathJax.typesetPromise) {
+        await new Promise(res => setTimeout(res, 300));
+        await (window as any).MathJax.typesetPromise([area]);
+      }
+      await new Promise(res => setTimeout(res, 3000));
+      setExportDocxStatus('menangkap_rumus');
+
+      const captureVisualElement = async (element: HTMLElement): Promise<{ buffer: Uint8Array, width: number, height: number } | null> => {
+        if (!element || !element.isConnected) return null;
+        await new Promise(res => setTimeout(res, 10));
+        try {
+          const canvas = await html2canvas(element, { scale: 3, backgroundColor: null, useCORS: true, logging: false, removeContainer: false });
+          const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
+          if (!blob) return null;
+          const arrayBuffer = await blob.arrayBuffer();
+          return { buffer: new Uint8Array(arrayBuffer), width: canvas.width / 3, height: canvas.height / 3 };
+        } catch (e) { return null; }
+      };
+
+      const processNodeToRuns = async (node: Node): Promise<any[]> => {
+        const runs: any[] = [];
+        const childrenNodes = Array.from(node.childNodes);
+        for (const child of childrenNodes) {
+          if (child.nodeType === Node.TEXT_NODE) {
+            const text = child.textContent;
+            if (text && text.trim()) runs.push(new docx.TextRun({ text: text, font: "Plus Jakarta Sans" }));
+          } else if (child.nodeType === Node.ELEMENT_NODE) {
+            const el = child as HTMLElement;
+            const isMathJax = el.tagName === 'MJX-CONTAINER' || el.closest('mjx-container');
+            if (isMathJax) {
+              const targetEl = el.tagName === 'MJX-CONTAINER' ? el : (el.closest('mjx-container') as HTMLElement || el);
+              const cap = await captureVisualElement(targetEl);
+              if (cap) {
+                const targetHeight = 16;
+                const scaleFactor = targetHeight / cap.height;
+                runs.push(new docx.ImageRun({ data: cap.buffer, transformation: { width: cap.width * scaleFactor * 1.3, height: cap.height * scaleFactor * 1.3 }, type: "png" }));
+                continue;
+              }
+            }
+            const subRuns = await processNodeToRuns(el);
+            runs.push(...subRuns);
+          }
+        }
+        return runs;
+      };
+
+      const docChildren: any[] = [];
+      setExportDocxStatus('menyusun_docx');
+      docChildren.push(new docx.Paragraph({ children: [new docx.TextRun({ text: "NASKAH SOAL EVALUASI HASIL BELAJAR", bold: true, size: 28, font: "Plus Jakarta Sans" })], alignment: docx.AlignmentType.CENTER }));
+      docChildren.push(new docx.Paragraph({ children: [new docx.TextRun({ text: `${quiz.subject.toUpperCase()} - ${quiz.grade.toUpperCase()}`, bold: true, size: 24, font: "Plus Jakarta Sans" })], alignment: docx.AlignmentType.CENTER }));
+      docChildren.push(new docx.Paragraph({ children: [new docx.TextRun({ text: `Kurikulum Merdeka • ${quiz.level}`, size: 18, color: "666666", font: "Plus Jakarta Sans" })], alignment: docx.AlignmentType.CENTER, spacing: { after: 200 } }));
+      docChildren.push(new docx.Paragraph({ border: { bottom: { style: docx.BorderStyle.DOUBLE, size: 20, color: "000000" } }, spacing: { after: 400 } }));
+      
+      let qNum = 1;
+      const types = Object.entries(groupedQuestions);
+      for (const [typeLabel, questions] of types) {
+        docChildren.push(new docx.Paragraph({ children: [new docx.TextRun({ text: typeLabel.toUpperCase(), bold: true, size: 22, font: "Plus Jakarta Sans" })], shading: { fill: "F3F4F6" }, spacing: { before: 200, after: 200 } }));
+        for (const q of questions) {
+          docChildren.push(new docx.Paragraph({ children: [new docx.TextRun({ text: `${qNum}. `, bold: true }), ...(await processNodeToRuns(Object.assign(document.createElement('div'), { innerHTML: q.text })))], spacing: { after: 100 } }));
+          if (q.options) {
+             for (const opt of q.options) {
+                docChildren.push(new docx.Paragraph({ children: [new docx.TextRun({ text: `${opt.label}. `, bold: true }), ...(await processNodeToRuns(Object.assign(document.createElement('div'), { innerHTML: opt.text })))], indent: { left: 400 } }));
+             }
+          }
+          if (showAnswer) {
+             docChildren.push(new docx.Paragraph({ children: [new docx.TextRun({ text: `KUNCI: ${Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}`, bold: true, color: "166534" })], spacing: { before: 100 } }));
+          }
+          qNum++;
+        }
+      }
+
+      const doc = new docx.Document({ sections: [{ children: docChildren }] });
+      const blob = await docx.Packer.toBlob(doc);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `${quiz.title}.docx`; document.body.appendChild(a); a.click();
+    } catch (err: any) { alert("Gagal DOCX: " + err.message); } finally { setExportDocxStatus('idle'); }
+  };
+
+  let globalDisplayCounter = 0;
 
   return (
     <div className="fixed inset-0 bg-orange-50/98 backdrop-blur-3xl z-[500] flex flex-col p-4 md:p-8 animate-in zoom-in-95 duration-300 print-modal-wrapper" role="dialog">
-      
       <header className="flex flex-col lg:flex-row justify-between items-center bg-white p-6 rounded-[2.5rem] shadow-2xl shadow-orange-100/50 mb-8 border border-orange-100 gap-6 no-print">
         <div className="flex items-center gap-5">
           <div className="w-14 h-14 orange-gradient rounded-2xl flex items-center justify-center text-white text-3xl shadow-lg">📄</div>
@@ -136,57 +260,50 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
             <div className="text-[9px] font-black text-orange-500 uppercase mt-1 tracking-widest">TAMPILAN: {exportMode.toUpperCase()}</div>
           </div>
         </div>
-        
         <div className="flex flex-wrap items-center justify-center gap-3">
           <div className="flex gap-1 bg-orange-50 p-1.5 rounded-2xl border border-orange-100">
              <button onClick={() => { setExportMode('soal'); setShowAnswer(false); }} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all ${exportMode === 'soal' ? 'bg-white text-orange-600 shadow-md' : 'text-orange-300 hover:text-orange-400'}`}>BUTIR SOAL</button>
              <button onClick={() => { setExportMode('kisi-kisi'); setShowAnswer(false); }} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all ${exportMode === 'kisi-kisi' ? 'bg-white text-orange-600 shadow-md' : 'text-orange-300 hover:text-orange-400'}`}>MATRIKS KISI-KISI</button>
              <button onClick={() => { setExportMode('lengkap'); setShowAnswer(true); }} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all ${exportMode === 'lengkap' ? 'bg-white text-orange-600 shadow-md' : 'text-orange-300 hover:text-orange-400'}`}>KUNCI JAWABAN</button>
           </div>
-          
-          <button onClick={handleExportPdfClient} disabled={isClientExporting} className="px-8 py-4 bg-orange-600 text-white rounded-2xl text-[10px] font-black shadow-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-50">
-            {isClientExporting ? "⏳..." : "📥 PDF (Instan)"}
-          </button>
-
-          <button onClick={handleDownloadPdfSSR} disabled={isDownloading} className="px-8 py-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black shadow-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-50">
-            {isDownloading ? "☁️..." : "☁️ PDF (Engine)"}
-          </button>
-
+          <button onClick={handleExportPdfClient} disabled={isClientExporting} className="px-5 py-4 bg-orange-600 text-white rounded-2xl text-[10px] font-black shadow-xl transition-all hover:scale-105 disabled:opacity-50">PDF</button>
+          <button onClick={handleExportDocx} disabled={exportDocxStatus !== 'idle'} className="px-5 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black shadow-xl transition-all hover:scale-105 disabled:opacity-50">DOCX</button>
+          <button onClick={handleExportGoogleDocs} disabled={isExportingDocs} className="px-5 py-4 bg-blue-500 text-white rounded-2xl text-[10px] font-black shadow-xl transition-all hover:scale-105 disabled:opacity-50">{isExportingDocs ? "..." : "G-Docs"}</button>
+          <button onClick={handleExportGoogleForms} disabled={isExportingForms} className="px-5 py-4 bg-purple-600 text-white rounded-2xl text-[10px] font-black shadow-xl transition-all hover:scale-105 disabled:opacity-50">{isExportingForms ? "..." : "G-Forms"}</button>
+          <button onClick={handleDownloadPdfSSR} disabled={isDownloading} className="px-5 py-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black shadow-xl transition-all hover:scale-105 disabled:opacity-50">Cloud</button>
           <button onClick={onClose} className="w-12 h-12 flex items-center justify-center text-orange-300 hover:text-red-500 bg-orange-100/50 rounded-full transition-colors font-bold">✕</button>
         </div>
       </header>
 
       <div className="flex-1 overflow-y-auto p-0 md:p-12 flex justify-center custom-scrollbar print-scroll-container">
         <div id="quiz-print-area" className={`print-container bg-white text-gray-900 shadow-none border-none ${exportMode === 'kisi-kisi' ? 'landscape-mode' : ''}`}>
-          
-          <div className="text-center mb-1">
-            <h1 className="text-xl font-black m-0 uppercase">NASKAH SOAL EVALUASI HASIL BELAJAR</h1>
-            <h2 className="text-lg font-bold m-0 uppercase">{quiz.subject} - {quiz.grade}</h2>
-            <p className="text-[9pt] font-medium text-gray-400 mt-1 uppercase tracking-widest">Kurikulum Merdeka • {quiz.level}</p>
+          <div className="avoid-break" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+            <div className="text-center mb-1">
+              <h1 className="text-xl font-black m-0 uppercase">NASKAH SOAL EVALUASI HASIL BELAJAR</h1>
+              <h2 className="text-lg font-bold m-0 uppercase">{quiz.subject} - {quiz.grade}</h2>
+              <p className="text-[9pt] font-medium text-gray-400 mt-1 uppercase tracking-widest">Kurikulum Merdeka • {quiz.level}</p>
+            </div>
+            <div className="border-t-[3px] border-b border-black h-[5px] mb-6"></div>
+            <div className="mb-6">
+              <table className="w-full border-collapse text-[10.5pt]">
+                <tbody>
+                  <tr>
+                    <td className="w-32 py-1 font-bold">Nama Siswa</td><td className="w-4 py-1 text-center">:</td>
+                    <td className="py-1 border-b border-gray-300 italic text-gray-300">......................................................................</td>
+                    <td className="w-32 py-1 font-bold text-right">Hari / Tanggal</td><td className="w-4 py-1 text-center">:</td>
+                    <td className="w-44 py-1 border-b border-gray-300 italic text-gray-300">..............................</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1 font-bold">Kelas / No. Absen</td><td className="py-1 text-center">:</td>
+                    <td className="py-1 border-b border-gray-300 italic text-gray-300">......................................................................</td>
+                    <td className="py-1 font-bold text-right">Waktu Ujian</td><td className="py-1 text-center">:</td>
+                    <td className="py-1 border-b border-gray-300 italic text-gray-300">90 Menit</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
-          
-          <div className="border-t-[3px] border-b border-black h-[5px] mb-6"></div>
-
-          <div className="mb-10">
-            <table className="w-full border-collapse text-[10.5pt]">
-              <tbody>
-                <tr>
-                  <td className="w-32 py-1 font-bold">Nama Siswa</td><td className="w-4 py-1 text-center">:</td>
-                  <td className="py-1 border-b border-gray-300 italic text-gray-300">......................................................................</td>
-                  <td className="w-32 py-1 font-bold text-right">Hari / Tanggal</td><td className="w-4 py-1 text-center">:</td>
-                  <td className="w-44 py-1 border-b border-gray-300 italic text-gray-300">..............................</td>
-                </tr>
-                <tr>
-                  <td className="py-1 font-bold">Kelas / No. Absen</td><td className="py-1 text-center">:</td>
-                  <td className="py-1 border-b border-gray-300 italic text-gray-300">......................................................................</td>
-                  <td className="py-1 font-bold text-right">Waktu Ujian</td><td className="py-1 text-center">:</td>
-                  <td className="py-1 border-b border-gray-300 italic text-gray-300">90 Menit</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div className="space-y-8">
+          <div className="space-y-6">
             {exportMode === 'kisi-kisi' ? (
               <>
                 <div className="text-[11pt] font-black underline uppercase mb-6 text-center">MATRIKS KISI-KISI PENULISAN SOAL</div>
@@ -194,9 +311,9 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                   <thead>
                     <tr className="bg-gray-100">
                       <th className="border-2 border-black p-2 w-8 text-center">NO</th>
-                      <th className="border-2 border-black p-2 w-48 text-left uppercase">CAPAIAN PEMBELAJARAN / KD</th>
-                      <th className="border-2 border-black p-2 w-32 text-left uppercase">MATERI POKOK</th>
-                      <th className="border-2 border-black p-2 text-left uppercase">INDIKATOR SOAL</th>
+                      <th className="border-2 border-black p-2 w-48 text-left uppercase">CP / KD</th>
+                      <th className="border-2 border-black p-2 w-32 text-left uppercase">MATERI</th>
+                      <th className="border-2 border-black p-2 text-left uppercase">INDIKATOR</th>
                       <th className="border-2 border-black p-2 w-20 text-center uppercase">LEVEL</th>
                       <th className="border-2 border-black p-2 w-24 text-center uppercase">BENTUK</th>
                       <th className="border-2 border-black p-2 w-12 text-center uppercase">NO</th>
@@ -207,19 +324,13 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                     {sortedQuestions.map((q, i) => (
                       <tr key={q.id}>
                         <td className="border-2 border-black p-2 text-center font-bold">{i + 1}</td>
-                        <td className="border-2 border-black p-2 align-top text-justify">
-                          {q.competency || `Menguasai standar kompetensi pada topik ${q.topic || quiz.topic}`}
-                        </td>
+                        <td className="border-2 border-black p-2 align-top text-justify">{q.competency || `Topik ${q.topic}`}</td>
                         <td className="border-2 border-black p-2 align-top font-bold">{q.topic || quiz.topic}</td>
-                        <td className="border-2 border-black p-2 align-top text-justify">
-                          <div dangerouslySetInnerHTML={{ __html: q.indicator }}></div>
-                        </td>
+                        <td className="border-2 border-black p-2 align-top text-justify"><div dangerouslySetInnerHTML={{ __html: q.indicator }}></div></td>
                         <td className="border-2 border-black p-2 text-center font-bold">{getCognitiveLevelLabel(q.cognitiveLevel).split(' ')[0]}</td>
                         <td className="border-2 border-black p-2 text-center text-[8pt] uppercase">{q.type}</td>
                         <td className="border-2 border-black p-2 text-center font-bold">{i + 1}</td>
-                        <td className="border-2 border-black p-2 text-center font-bold uppercase text-orange-600">
-                          {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}
-                        </td>
+                        <td className="border-2 border-black p-2 text-center font-bold uppercase text-orange-600">{Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -228,17 +339,13 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
             ) : (
               Object.entries(groupedQuestions).map(([type, questions], gIdx) => (
                 <div key={type} className="space-y-6">
-                  <div className="bg-gray-100 px-6 py-2 border-y-2 border-black font-black text-[11pt] uppercase tracking-tighter">
-                    {String.fromCharCode(65 + gIdx)}. {type}
-                  </div>
-                  
-                  <div className="space-y-8">
+                  <div className="bg-gray-100 px-6 py-2 border-y-2 border-black font-black text-[11pt] uppercase tracking-tighter avoid-break" style={{ pageBreakAfter: 'avoid' }}>{String.fromCharCode(65 + gIdx)}. {type}</div>
+                  <div className="space-y-6">
                     {questions.map((q, i) => {
-                      globalIndex++; // Tambah counter global setiap butir soal
+                      globalDisplayCounter++;
                       const isNewPassage = q.passage && (i === 0 || questions[i-1].passage !== q.passage);
-                      
                       return (
-                        <div key={q.id} className="pdf-block" style={{ pageBreakInside: 'avoid' }}>
+                        <div key={q.id} className="pdf-block" style={{ pageBreakInside: 'avoid' }} aria-label={`Soal nomor ${globalDisplayCounter}`}>
                           {isNewPassage && (
                             <div className="bg-gray-50 border-2 border-black p-5 mb-6 italic text-[10.5pt] text-justify leading-relaxed relative">
                               <div className="absolute top-0 left-4 -translate-y-1/2 bg-white px-2 text-[8pt] font-black uppercase border border-black tracking-widest">WACANA STIMULUS</div>
@@ -246,10 +353,9 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                             </div>
                           )}
                           <div className="flex gap-4 text-[11pt] leading-relaxed">
-                            <div className="font-bold w-6 shrink-0 text-right">{globalIndex}.</div>
+                            <div className="font-bold w-6 shrink-0 text-right">{globalDisplayCounter}.</div>
                             <div className="flex-1">
-                              <div className="mb-3 text-justify" dangerouslySetInnerHTML={{ __html: q.text }}></div>
-                              
+                              <div className="mb-3 text-justify text-lg font-bold" dangerouslySetInnerHTML={{ __html: q.text }}></div>
                               {q.options && q.options.length > 0 && (
                                 <div className="grid grid-cols-2 gap-x-10 gap-y-1 mb-4 ml-1">
                                   {q.options.map(opt => (
@@ -260,18 +366,11 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                                   ))}
                                 </div>
                               )}
-
                               {(exportMode === 'lengkap' || showAnswer) && (
                                 <div className="bg-emerald-50 border-2 border-emerald-200 p-5 rounded-3xl text-[9.5pt] italic mt-4 shadow-sm">
-                                  <div className="flex items-center gap-3 mb-2">
-                                     <span className="bg-emerald-600 text-white px-3 py-1 rounded-full text-[8pt] font-black not-italic uppercase tracking-widest">KUNCI: {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</span>
-                                  </div>
+                                  <div className="flex items-center gap-3 mb-2"><span className="bg-emerald-600 text-white px-3 py-1 rounded-full text-[8pt] font-black not-italic uppercase tracking-widest">KUNCI: {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</span></div>
                                   <div className="text-emerald-800 leading-relaxed" dangerouslySetInnerHTML={{ __html: q.explanation }}></div>
                                 </div>
-                              )}
-                              
-                              {exportMode === 'soal' && !showAnswer && type !== 'Pilihan Ganda' && (
-                                <div className="border-b border-dotted border-gray-300 h-16 w-full mt-4 opacity-30"></div>
                               )}
                             </div>
                           </div>
@@ -282,11 +381,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
                 </div>
               ))
             )}
-          </div>
-          
-          <div className="mt-16 pt-4 border-t border-gray-100 text-[8pt] text-gray-400 italic flex justify-between no-print">
-            <span>GenZ QuizGen Pro - AI Powered Engine v3.1</span>
-            <span>Ref ID: {quiz.id.substring(0,8).toUpperCase()}</span>
           </div>
         </div>
       </div>
