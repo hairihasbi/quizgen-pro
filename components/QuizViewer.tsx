@@ -5,9 +5,10 @@ import { Quiz, QuestionType, Question } from '../types';
 interface QuizViewerProps {
   quiz: Quiz;
   onClose: () => void;
+  hideDownload?: boolean; // Properti baru untuk kontrol visibilitas tombol unduh
 }
 
-const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
+const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = false }) => {
   const [showAnswer, setShowAnswer] = useState(false);
   const [exportMode, setExportMode] = useState<'soal' | 'kisi-kisi' | 'lengkap'>('soal');
   const [isDownloading, setIsDownloading] = useState(false);
@@ -144,13 +145,17 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
              <button onClick={() => { setExportMode('lengkap'); setShowAnswer(true); }} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all ${exportMode === 'lengkap' ? 'bg-white text-orange-600 shadow-md' : 'text-orange-300 hover:text-orange-400'}`}>KUNCI JAWABAN</button>
           </div>
           
-          <button onClick={handleExportPdfClient} disabled={isClientExporting} className="px-8 py-4 bg-orange-600 text-white rounded-2xl text-[10px] font-black shadow-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-50">
-            {isClientExporting ? "⏳..." : "📥 PDF (Instan)"}
-          </button>
+          {!hideDownload && (
+            <>
+              <button onClick={handleExportPdfClient} disabled={isClientExporting} className="px-8 py-4 bg-orange-600 text-white rounded-2xl text-[10px] font-black shadow-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-50">
+                {isClientExporting ? "⏳..." : "📥 PDF (Instan)"}
+              </button>
 
-          <button onClick={handleDownloadPdfSSR} disabled={isDownloading} className="px-8 py-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black shadow-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-50">
-            {isDownloading ? "☁️..." : "☁️ PDF (Engine)"}
-          </button>
+              <button onClick={handleDownloadPdfSSR} disabled={isDownloading} className="px-8 py-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black shadow-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-50">
+                {isDownloading ? "☁️..." : "☁️ PDF (Engine)"}
+              </button>
+            </>
+          )}
 
           <button onClick={onClose} className="w-12 h-12 flex items-center justify-center text-orange-300 hover:text-red-500 bg-orange-100/50 rounded-full transition-colors font-bold">✕</button>
         </div>
@@ -159,15 +164,15 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
       <div className="flex-1 overflow-y-auto p-0 md:p-12 flex justify-center custom-scrollbar print-scroll-container">
         <div id="quiz-print-area" className={`print-container bg-white text-gray-900 shadow-none border-none ${exportMode === 'kisi-kisi' ? 'landscape-mode' : ''}`}>
           
-          <div className="text-center mb-1">
+          <div className="text-center mb-1 relative z-10">
             <h1 className="text-xl font-black m-0 uppercase">NASKAH SOAL EVALUASI HASIL BELAJAR</h1>
             <h2 className="text-lg font-bold m-0 uppercase">{quiz.subject} - {quiz.grade}</h2>
             <p className="text-[9pt] font-medium text-gray-400 mt-1 uppercase tracking-widest">Kurikulum Merdeka • {quiz.level}</p>
           </div>
           
-          <div className="border-t-[3px] border-b border-black h-[5px] mb-6"></div>
+          <div className="border-t-[3px] border-b border-black h-[5px] mb-6 relative z-10"></div>
 
-          <div className="mb-10">
+          <div className="mb-10 relative z-10">
             <table className="w-full border-collapse text-[10.5pt]">
               <tbody>
                 <tr>
@@ -186,7 +191,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
             </table>
           </div>
 
-          <div className="space-y-8">
+          <div className="space-y-8 relative z-10">
             {exportMode === 'kisi-kisi' ? (
               <>
                 <div className="text-[11pt] font-black underline uppercase mb-6 text-center">MATRIKS KISI-KISI PENULISAN SOAL</div>
@@ -263,8 +268,15 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
 
                               {(exportMode === 'lengkap' || showAnswer) && (
                                 <div className="bg-emerald-50 border-2 border-emerald-200 p-5 rounded-3xl text-[9.5pt] italic mt-4 shadow-sm">
-                                  <div className="flex items-center gap-3 mb-2">
-                                     <span className="bg-emerald-600 text-white px-3 py-1 rounded-full text-[8pt] font-black not-italic uppercase tracking-widest">KUNCI: {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</span>
+                                  <div className="flex flex-col gap-2 mb-2">
+                                     <div className="flex items-center gap-3">
+                                        <span className="bg-emerald-600 text-white px-3 py-1 rounded-full text-[8pt] font-black not-italic uppercase tracking-widest">KUNCI: {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</span>
+                                        {q.citation && (
+                                          <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-[8pt] font-black not-italic uppercase tracking-widest flex items-center gap-1">
+                                            🔍 Sitasi: {q.citation}
+                                          </span>
+                                        )}
+                                     </div>
                                   </div>
                                   <div className="text-emerald-800 leading-relaxed" dangerouslySetInnerHTML={{ __html: q.explanation }}></div>
                                 </div>
@@ -284,9 +296,14 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
             )}
           </div>
           
-          <div className="mt-16 pt-4 border-t border-gray-100 text-[8pt] text-gray-400 italic flex justify-between no-print">
+          <div className="mt-16 pt-4 border-t border-gray-100 text-[8pt] text-gray-400 italic flex justify-between relative z-10 no-print">
             <span>GenZ QuizGen Pro - AI Powered Engine v3.1</span>
-            <span>Ref ID: {quiz.id.substring(0,8).toUpperCase()}</span>
+            <span className="font-bold text-gray-300 select-none">DIGITAL_FINGERPRINT: {quiz.id.toUpperCase()}</span>
+          </div>
+
+          {/* HIDDEN PLAGIARISM MARKERS (Visible only on inspection/metadata) */}
+          <div style={{ position: 'absolute', bottom: '2mm', left: '2mm', fontSize: '1px', color: 'rgba(0,0,0,0.01)', userSelect: 'none', pointerEvents: 'none' }}>
+             Authored by {quiz.authorName} via GenZ QuizGen Pro System ID {quiz.id}. Plagiarism is strictly prohibited.
           </div>
         </div>
       </div>
