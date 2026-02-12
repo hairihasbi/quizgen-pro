@@ -1,7 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Quiz, QuestionType, Question } from '../types';
-import * as docx from 'docx';
-import html2canvas from 'html2canvas';
 import { GoogleFormsService } from '../services/googleFormsService';
 import { GoogleDocsService } from '../services/googleDocsService';
 
@@ -10,14 +8,11 @@ interface QuizViewerProps {
   onClose: () => void;
 }
 
-type ExportDocxStatus = 'idle' | 'menyiapkan_engine' | 'menangkap_rumus' | 'menyusun_docx';
-
 const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
   const [showAnswer, setShowAnswer] = useState(false);
   const [exportMode, setExportMode] = useState<'soal' | 'kisi-kisi' | 'lengkap'>('soal');
   const [isDownloading, setIsDownloading] = useState(false);
   const [isClientExporting, setIsClientExporting] = useState(false);
-  const [exportDocxStatus, setExportDocxStatus] = useState<ExportDocxStatus>('idle');
   const [isExportingForms, setIsExportingForms] = useState(false);
   const [isExportingDocs, setIsExportingDocs] = useState(false);
 
@@ -102,7 +97,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
 
     setIsClientExporting(true);
     
-    // Pastikan MathJax sudah ter-render sempurna
     await triggerMathJax('quiz-print-area');
     await new Promise(r => setTimeout(r, 800));
     
@@ -116,9 +110,9 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
         scale: 2, 
         useCORS: true, 
         letterRendering: true,
-        scrollY: 0, // PENTING: Mencegah offset pada halaman bank soal yang panjang
+        scrollY: 0,
         scrollX: 0,
-        windowWidth: isLandscape ? 1200 : 800 // Kunci lebar window virtual
+        windowWidth: isLandscape ? 1200 : 800
       },
       jsPDF: { 
         unit: 'mm', 
@@ -165,89 +159,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
     }
   };
 
-  const handleExportDocx = async () => {
-    const area = document.getElementById('quiz-print-area');
-    if (!area) return;
-    setExportDocxStatus('menyiapkan_engine');
-    try {
-      if ((window as any).MathJax && (window as any).MathJax.typesetPromise) {
-        await new Promise(res => setTimeout(res, 300));
-        await (window as any).MathJax.typesetPromise([area]);
-      }
-      await new Promise(res => setTimeout(res, 3000));
-      setExportDocxStatus('menangkap_rumus');
-
-      const captureVisualElement = async (element: HTMLElement): Promise<{ buffer: Uint8Array, width: number, height: number } | null> => {
-        if (!element || !element.isConnected) return null;
-        await new Promise(res => setTimeout(res, 10));
-        try {
-          const canvas = await html2canvas(element, { scale: 3, backgroundColor: null, useCORS: true, logging: false, removeContainer: false });
-          const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
-          if (!blob) return null;
-          const arrayBuffer = await blob.arrayBuffer();
-          return { buffer: new Uint8Array(arrayBuffer), width: canvas.width / 3, height: canvas.height / 3 };
-        } catch (e) { return null; }
-      };
-
-      const processNodeToRuns = async (node: Node): Promise<any[]> => {
-        const runs: any[] = [];
-        const childrenNodes = Array.from(node.childNodes);
-        for (const child of childrenNodes) {
-          if (child.nodeType === Node.TEXT_NODE) {
-            const text = child.textContent;
-            if (text && text.trim()) runs.push(new docx.TextRun({ text: text, font: "Plus Jakarta Sans" }));
-          } else if (child.nodeType === Node.ELEMENT_NODE) {
-            const el = child as HTMLElement;
-            const isMathJax = el.tagName === 'MJX-CONTAINER' || el.closest('mjx-container');
-            if (isMathJax) {
-              const targetEl = el.tagName === 'MJX-CONTAINER' ? el : (el.closest('mjx-container') as HTMLElement || el);
-              const cap = await captureVisualElement(targetEl);
-              if (cap) {
-                const targetHeight = 16;
-                const scaleFactor = targetHeight / cap.height;
-                runs.push(new docx.ImageRun({ data: cap.buffer, transformation: { width: cap.width * scaleFactor * 1.3, height: cap.height * scaleFactor * 1.3 }, type: "png" }));
-                continue;
-              }
-            }
-            const subRuns = await processNodeToRuns(el);
-            runs.push(...subRuns);
-          }
-        }
-        return runs;
-      };
-
-      const docChildren: any[] = [];
-      setExportDocxStatus('menyusun_docx');
-      docChildren.push(new docx.Paragraph({ children: [new docx.TextRun({ text: "NASKAH SOAL EVALUASI HASIL BELAJAR", bold: true, size: 28, font: "Plus Jakarta Sans" })], alignment: docx.AlignmentType.CENTER }));
-      docChildren.push(new docx.Paragraph({ children: [new docx.TextRun({ text: `${quiz.subject.toUpperCase()} - ${quiz.grade.toUpperCase()}`, bold: true, size: 24, font: "Plus Jakarta Sans" })], alignment: docx.AlignmentType.CENTER }));
-      docChildren.push(new docx.Paragraph({ children: [new docx.TextRun({ text: `Kurikulum Merdeka • ${quiz.level}`, size: 18, color: "666666", font: "Plus Jakarta Sans" })], alignment: docx.AlignmentType.CENTER, spacing: { after: 200 } }));
-      docChildren.push(new docx.Paragraph({ border: { bottom: { style: docx.BorderStyle.DOUBLE, size: 20, color: "000000" } }, spacing: { after: 400 } }));
-      
-      let qNum = 1;
-      const types = Object.entries(groupedQuestions);
-      for (const [typeLabel, questions] of types) {
-        docChildren.push(new docx.Paragraph({ children: [new docx.TextRun({ text: typeLabel.toUpperCase(), bold: true, size: 22, font: "Plus Jakarta Sans" })], shading: { fill: "F3F4F6" }, spacing: { before: 200, after: 200 } }));
-        for (const q of questions) {
-          docChildren.push(new docx.Paragraph({ children: [new docx.TextRun({ text: `${qNum}. `, bold: true }), ...(await processNodeToRuns(Object.assign(document.createElement('div'), { innerHTML: q.text })))], spacing: { after: 100 } }));
-          if (q.options) {
-             for (const opt of q.options) {
-                docChildren.push(new docx.Paragraph({ children: [new docx.TextRun({ text: `${opt.label}. `, bold: true }), ...(await processNodeToRuns(Object.assign(document.createElement('div'), { innerHTML: opt.text })))], indent: { left: 400 } }));
-             }
-          }
-          if (showAnswer) {
-             docChildren.push(new docx.Paragraph({ children: [new docx.TextRun({ text: `KUNCI: ${Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}`, bold: true, color: "166534" })], spacing: { before: 100 } }));
-          }
-          qNum++;
-        }
-      }
-
-      const doc = new docx.Document({ sections: [{ children: docChildren }] });
-      const blob = await docx.Packer.toBlob(doc);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = `${quiz.title}.docx`; document.body.appendChild(a); a.click();
-    } catch (err: any) { alert("Gagal DOCX: " + err.message); } finally { setExportDocxStatus('idle'); }
-  };
-
   let globalDisplayCounter = 0;
 
   return (
@@ -267,7 +178,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose }) => {
              <button onClick={() => { setExportMode('lengkap'); setShowAnswer(true); }} className={`px-6 py-2.5 rounded-xl text-[10px] font-black transition-all ${exportMode === 'lengkap' ? 'bg-white text-orange-600 shadow-md' : 'text-orange-300 hover:text-orange-400'}`}>KUNCI JAWABAN</button>
           </div>
           <button onClick={handleExportPdfClient} disabled={isClientExporting} className="px-5 py-4 bg-orange-600 text-white rounded-2xl text-[10px] font-black shadow-xl transition-all hover:scale-105 disabled:opacity-50">PDF</button>
-          <button onClick={handleExportDocx} disabled={exportDocxStatus !== 'idle'} className="px-5 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black shadow-xl transition-all hover:scale-105 disabled:opacity-50">DOCX</button>
           <button onClick={handleExportGoogleDocs} disabled={isExportingDocs} className="px-5 py-4 bg-blue-500 text-white rounded-2xl text-[10px] font-black shadow-xl transition-all hover:scale-105 disabled:opacity-50">{isExportingDocs ? "..." : "G-Docs"}</button>
           <button onClick={handleExportGoogleForms} disabled={isExportingForms} className="px-5 py-4 bg-purple-600 text-white rounded-2xl text-[10px] font-black shadow-xl transition-all hover:scale-105 disabled:opacity-50">{isExportingForms ? "..." : "G-Forms"}</button>
           <button onClick={handleDownloadPdfSSR} disabled={isDownloading} className="px-5 py-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black shadow-xl transition-all hover:scale-105 disabled:opacity-50">Cloud</button>
