@@ -1,10 +1,6 @@
 
 import { createClient } from '@libsql/client';
 
-/**
- * World Class Email Dispatcher
- * Menangani pengiriman email asli menggunakan Provider yang dikonfigurasi Admin.
- */
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ message: 'Method Not Allowed' });
 
@@ -17,52 +13,64 @@ export default async function handler(req: any, res: any) {
   const { to, subject, html } = req.body;
 
   try {
-    // 1. Ambil Pengaturan Email dari DB
     const settingsRes = await db.execute("SELECT data FROM email_settings WHERE id = 'global'");
     if (settingsRes.rows.length === 0) {
-      return res.status(500).json({ message: 'Email service is not configured by admin' });
+      return res.status(500).json({ message: 'Email service is not configured' });
     }
 
     const settings = JSON.parse(settingsRes.rows[0].data as string);
-    
-    // Fallback ke Environment Variable jika API Key kosong di DB (untuk keamanan Vercel)
-    const apiKey = settings.apiKey || process.env.RESEND_API_KEY;
+    const apiKey = settings.apiKey;
 
-    if (settings.provider === 'none' || !apiKey) {
-      console.log("[EMAIL_SERVICE] Provider disabled or API Key missing. Skipping real email.");
-      return res.status(200).json({ status: 'skipped', reason: 'disabled' });
+    if (settings.provider === 'none' || (!apiKey && settings.method === 'api')) {
+      return res.status(200).json({ status: 'skipped', reason: 'provider_disabled' });
     }
 
-    // 2. Pilih Logic berdasarkan Provider (Mendukung Resend saat ini, SMTP di masa depan)
-    if (settings.provider === 'resend') {
-      const resendRes = await fetch('https://api.resend.com/emails', {
+    // Jika metode SMTP dipilih, logic-nya tetap placeholder atau menggunakan relay
+    if (settings.method === 'smtp') {
+      return res.status(501).json({ message: 'SMTP relay functionality is handled via global server relay, not implemented in edge functions directly.' });
+    }
+
+    // --- MAILERSEND API LOGIC ---
+    if (settings.provider === 'mailersend') {
+      const msRes = await fetch('https://api.mailersend.com/v1/email', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          from: `${settings.senderName} <${settings.fromEmail}>`,
-          to: [to],
+          from: { email: settings.fromEmail, name: settings.senderName },
+          to: [{ email: to }],
           subject: subject,
           html: html
         })
       });
-
-      const result = await resendRes.json();
-      if (!resendRes.ok) throw new Error(result.message || 'Resend API Error');
-
-      return res.status(200).json({ status: 'sent', provider: 'resend', id: result.id });
+      if (!msRes.ok) throw new Error(await msRes.text());
+      return res.status(200).json({ status: 'sent', provider: 'mailersend' });
     }
 
-    // 3. Placeholder untuk SMTP (Bisa menggunakan library nodemailer jika di lingkungan Node murni)
-    if (settings.provider === 'smtp') {
-      // NOTE: Di lingkungan Edge/Serverless Vercel, pengiriman SMTP murni seringkali butuh library khusus (seperti SMTJS) 
-      // atau layanan HTTP relay. Disarankan tetap menggunakan provider berbasis API seperti Resend/SendGrid.
-      return res.status(501).json({ message: 'SMTP provider logic not yet implemented in edge function' });
+    // --- BREVO (SENDINBLUE) API LOGIC ---
+    if (settings.provider === 'brevo') {
+      const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'content-type': 'application/json',
+          'api-key': apiKey
+        },
+        body: JSON.stringify({
+          sender: { name: settings.senderName, email: settings.fromEmail },
+          to: [{ email: to }],
+          subject: subject,
+          htmlContent: html
+        })
+      });
+      if (!brevoRes.ok) throw new Error(await brevoRes.text());
+      return res.status(200).json({ status: 'sent', provider: 'brevo' });
     }
 
-    return res.status(400).json({ message: 'Invalid email provider' });
+    return res.status(400).json({ message: 'Invalid provider configuration' });
   } catch (error: any) {
     console.error("[EMAIL_DISPATCH_ERROR]", error);
     return res.status(500).json({ message: error.message });
