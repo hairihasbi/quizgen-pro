@@ -39,6 +39,7 @@ export interface Question {
   options?: { label: string; text: string; image?: string }[];
   answer: string | string[];
   explanation: string;
+  citation?: string; // Grounding field (Anti-Halusinasi)
   indicator: string;
   competency: string;
   topic: string;
