@@ -5,7 +5,7 @@ import { Quiz, QuestionType, Question } from '../types';
 interface QuizViewerProps {
   quiz: Quiz;
   onClose: () => void;
-  hideDownload?: boolean; // Properti baru untuk kontrol visibilitas tombol unduh
+  hideDownload?: boolean;
 }
 
 const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = false }) => {
@@ -100,7 +100,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          quiz: { ...quiz, questions: sortedQuestions }, // Kirim yang sudah sorted
+          quiz: { ...quiz, questions: sortedQuestions }, 
           showAnswer: exportMode === 'lengkap' || showAnswer,
           mode: exportMode
         })
@@ -239,7 +239,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
                   
                   <div className="space-y-8">
                     {questions.map((q, i) => {
-                      globalIndex++; // Tambah counter global setiap butir soal
+                      globalIndex++; 
                       const isNewPassage = q.passage && (i === 0 || questions[i-1].passage !== q.passage);
                       
                       return (
@@ -301,7 +301,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
             <span className="font-bold text-gray-300 select-none">DIGITAL_FINGERPRINT: {quiz.id.toUpperCase()}</span>
           </div>
 
-          {/* HIDDEN PLAGIARISM MARKERS (Visible only on inspection/metadata) */}
           <div style={{ position: 'absolute', bottom: '2mm', left: '2mm', fontSize: '1px', color: 'rgba(0,0,0,0.01)', userSelect: 'none', pointerEvents: 'none' }}>
              Authored by {quiz.authorName} via GenZ QuizGen Pro System ID {quiz.id}. Plagiarism is strictly prohibited.
           </div>
