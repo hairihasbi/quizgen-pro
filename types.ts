@@ -112,7 +112,8 @@ export interface EmailNotification {
 }
 
 export interface EmailSettings {
-  provider: 'none' | 'resend' | 'smtp';
+  provider: 'none' | 'mailersend' | 'brevo';
+  method: 'api' | 'smtp';
   apiKey: string;
   fromEmail: string;
   senderName: string;
@@ -142,7 +143,7 @@ export interface PaymentPackage {
   credits: number;
   price: number;
   isActive: boolean;
-  paymentLink?: string; // Properti baru untuk Link Pembayaran Langsung
+  paymentLink?: string;
 }
 
 export interface PaymentSettings {
