@@ -79,12 +79,20 @@ export default async function handler(req: any, res: any) {
           font-family: 'Noto Serif', serif; 
           margin: 0; padding: 0; background: white; color: black;
           line-height: 1.4;
+          position: relative;
         }
 
         .page {
           padding: 15mm;
           margin: 0 auto;
           box-sizing: border-box;
+          position: relative;
+          min-height: 297mm;
+        }
+
+        .content-wrap {
+          position: relative;
+          z-index: 10;
         }
 
         .header { text-align: center; margin-bottom: 5px; }
@@ -128,91 +136,114 @@ export default async function handler(req: any, res: any) {
         .kisi-table th { background: #eeeeee; font-weight: 800; text-align: center; }
 
         mjx-container { display: inline-block !important; vertical-align: middle; margin: 0 2px !important; }
+        
+        .footer-fingerprint {
+          margin-top: 30px;
+          border-top: 1px solid #eee;
+          padding-top: 10px;
+          font-size: 7pt;
+          color: #999;
+          display: flex;
+          justify-content: space-between;
+          font-style: italic;
+        }
       </style>
     </head>
     <body>
       <div class="page">
-        <div class="header">
-          <h1>NASKAH SOAL EVALUASI HASIL BELAJAR</h1>
-          <h2>${quiz.subject.toUpperCase()} - ${quiz.grade.toUpperCase()}</h2>
-        </div>
-        <div class="header-line"></div>
+        <div class="content-wrap">
+          <div class="header">
+            <h1>NASKAH SOAL EVALUASI HASIL BELAJAR</h1>
+            <h2>${quiz.subject.toUpperCase()} - ${quiz.grade.toUpperCase()}</h2>
+          </div>
+          <div class="header-line"></div>
 
-        <table class="student-id">
-          <tr>
-            <td width="15%">Nama Siswa</td><td width="2%">:</td><td class="dot-line">.........................................................</td>
-            <td width="15%" align="right">Hari / Tanggal</td><td width="2%">:</td><td width="20%" class="dot-line">......................</td>
-          </tr>
-          <tr>
-            <td>Kelas / No. Absen</td><td>:</td><td class="dot-line">.........................................................</td>
-            <td align="right">Waktu</td><td>:</td><td class="dot-line">90 Menit</td>
-          </tr>
-        </table>
-
-        ${isKisiKisi ? `
-          <div style="text-align:center; text-decoration:underline; font-weight:800; font-family:'Plus Jakarta Sans'; margin-bottom:20px;">MATRIKS KISI-KISI SOAL</div>
-          <table class="kisi-table">
-            <thead>
-              <tr>
-                <th width="30">NO</th>
-                <th width="180">CAPAIAN PEMBELAJARAN (CP) / KD</th>
-                <th width="100">MATERI</th>
-                <th>INDIKATOR SOAL</th>
-                <th width="60">LEVEL</th>
-                <th width="70">BENTUK</th>
-                <th width="30">NO</th>
-                <th width="40">KUNCI</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${sortedQuestions.map((q: any, i: number) => `
-                <tr>
-                  <td style="text-align:center;">${i + 1}</td>
-                  <td>${q.competency || `Menguasai topik ${q.topic}`}</td>
-                  <td style="font-weight:700;">${q.topic}</td>
-                  <td>${q.indicator}</td>
-                  <td style="text-align:center; font-weight:700;">${mapLevel(q.cognitiveLevel)}</td>
-                  <td style="text-align:center;">${q.type}</td>
-                  <td style="text-align:center; font-weight:700;">${i + 1}</td>
-                  <td style="text-align:center; font-weight:700;">${Array.isArray(q.answer) ? q.answer.join(',') : q.answer}</td>
-                </tr>
-              `).join('')}
-            </tbody>
+          <table class="student-id">
+            <tr>
+              <td width="15%">Nama Siswa</td><td width="2%">:</td><td class="dot-line">.........................................................</td>
+              <td width="15%" align="right">Hari / Tanggal</td><td width="2%">:</td><td width="20%" class="dot-line">......................</td>
+            </tr>
+            <tr>
+              <td>Kelas / No. Absen</td><td>:</td><td class="dot-line">.........................................................</td>
+              <td align="right">Waktu</td><td>:</td><td class="dot-line">90 Menit</td>
+            </tr>
           </table>
-        ` : `
-          ${Object.entries(grouped).map(([type, questions], gIdx) => `
-            <div class="type-header">${String.fromCharCode(65 + gIdx)}. ${type}</div>
-            <div class="questions">
-              ${questions.map((q: any) => {
-                globalCounter++;
-                const isNewPassage = q.passage && (questions.indexOf(q) === 0 || questions[questions.indexOf(q)-1].passage !== q.passage);
-                return `
-                  ${isNewPassage ? `<div class="passage"><strong>WACANA STIMULUS:</strong><br/>${q.passage}</div>` : ''}
-                  <div class="question-item">
-                    <div class="q-num">${globalCounter}.</div>
-                    <div class="q-body">
-                      <div>${q.text}</div>
-                      ${q.options && q.options.length > 0 ? `
-                        <div class="options-grid">
-                          ${q.options.map((opt: any) => `
-                            <div class="option-item">
-                              <span class="opt-label">${opt.label}.</span>
-                              <span>${opt.text}</span>
-                            </div>
-                          `).join('')}
-                        </div>
-                      ` : ''}
-                      ${showAnswer ? `<div style="margin-top:10px; padding:8px; background:#f0fdf4; border:1px dashed #166534; font-size:9pt;">
-                        <strong>KUNCI: ${Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</strong><br/>
-                        <em>Pembahasan: ${q.explanation}</em>
-                      </div>` : ''}
+
+          ${isKisiKisi ? `
+            <div style="text-align:center; text-decoration:underline; font-weight:800; font-family:'Plus Jakarta Sans'; margin-bottom:20px;">MATRIKS KISI-KISI SOAL</div>
+            <table class="kisi-table">
+              <thead>
+                <tr>
+                  <th width="30">NO</th>
+                  <th width="180">CAPAIAN PEMBELAJARAN (CP) / KD</th>
+                  <th width="100">MATERI</th>
+                  <th>INDIKATOR SOAL</th>
+                  <th width="60">LEVEL</th>
+                  <th width="70">BENTUK</th>
+                  <th width="30">NO</th>
+                  <th width="40">KUNCI</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${sortedQuestions.map((q: any, i: number) => `
+                  <tr>
+                    <td style="text-align:center;">${i + 1}</td>
+                    <td>${q.competency || `Menguasai topik ${q.topic}`}</td>
+                    <td style="font-weight:700;">${q.topic}</td>
+                    <td>${q.indicator}</td>
+                    <td style="text-align:center; font-weight:700;">${mapLevel(q.cognitiveLevel)}</td>
+                    <td style="text-align:center;">${q.type}</td>
+                    <td style="text-align:center; font-weight:700;">${i + 1}</td>
+                    <td style="text-align:center; font-weight:700;">${Array.isArray(q.answer) ? q.answer.join(',') : q.answer}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          ` : `
+            ${Object.entries(grouped).map(([type, questions], gIdx) => `
+              <div class="type-header">${String.fromCharCode(65 + gIdx)}. ${type}</div>
+              <div class="questions">
+                ${questions.map((q: any) => {
+                  globalCounter++;
+                  const isNewPassage = q.passage && (questions.indexOf(q) === 0 || questions[questions.indexOf(q)-1].passage !== q.passage);
+                  return `
+                    ${isNewPassage ? `<div class="passage"><strong>WACANA STIMULUS:</strong><br/>${q.passage}</div>` : ''}
+                    <div class="question-item">
+                      <div class="q-num">${globalCounter}.</div>
+                      <div class="q-body">
+                        <div>${q.text}</div>
+                        ${q.options && q.options.length > 0 ? `
+                          <div class="options-grid">
+                            ${q.options.map((opt: any) => `
+                              <div class="option-item">
+                                <span class="opt-label">${opt.label}.</span>
+                                <span>${opt.text}</span>
+                              </div>
+                            `).join('')}
+                          </div>
+                        ` : ''}
+                        ${showAnswer ? `<div style="margin-top:10px; padding:8px; background:#f0fdf4; border:1px dashed #166534; font-size:9pt;">
+                          <strong>KUNCI: ${Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</strong><br/>
+                          <em>Pembahasan: ${q.explanation}</em>
+                        </div>` : ''}
+                      </div>
                     </div>
-                  </div>
-                `;
-              }).join('')}
-            </div>
-          `).join('')}
-        `}
+                  `;
+                }).join('')}
+              </div>
+            `).join('')}
+          `}
+          
+          <div class="footer-fingerprint">
+            <span>Verified Educational Asset by GenZ QuizGen Pro v3.1</span>
+            <span>Fingerprint: ${quiz.id.toUpperCase()} • Generated on ${new Date().toLocaleDateString()}</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- INVISIBLE PLAGIARISM MARKER -->
+      <div style="position:fixed; top:0; left:0; width:1px; height:1px; color:rgba(0,0,0,0.01); font-size:1px; overflow:hidden;">
+        SECURE_DOCUMENT_ID:${quiz.id};AUTHOR:${quiz.authorName};DISTRIBUTION_LOCK:ENABLED;
       </div>
     </body>
     </html>
