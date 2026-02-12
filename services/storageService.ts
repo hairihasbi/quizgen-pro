@@ -156,7 +156,8 @@ export const StorageService = {
   },
   getEmailSettings: async (): Promise<EmailSettings> => {
     const local = localStorage.getItem('quizgen_email_settings');
-    if (!local) return { provider: 'none', apiKey: '', fromEmail: 'notifications@quizgen.pro', senderName: 'GenZ QuizGen System' };
+    // Fix: Added missing 'method' property to match EmailSettings interface
+    if (!local) return { provider: 'none', method: 'api', apiKey: '', fromEmail: 'notifications@quizgen.pro', senderName: 'GenZ QuizGen System' };
     const settings = JSON.parse(local);
     if (settings.apiKey && !settings.apiKey.includes('•')) settings.apiKey = StorageService.maskKey(settings.apiKey);
     return settings;
