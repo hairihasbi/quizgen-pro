@@ -1,5 +1,4 @@
 
-// ... existing imports
 import React, { useState, useMemo, useEffect } from 'react';
 import { StorageService } from '../services/storageService';
 import { Quiz } from '../types';
@@ -138,7 +137,7 @@ const PublicGallery: React.FC = () => {
         )}
       </main>
 
-      {selectedQuiz && <QuizViewer quiz={selectedQuiz} onClose={() => setSelectedQuiz(null)} />}
+      {selectedQuiz && <QuizViewer quiz={selectedQuiz} onClose={() => setSelectedQuiz(null)} hideDownload={true} />}
     </div>
   );
 };
