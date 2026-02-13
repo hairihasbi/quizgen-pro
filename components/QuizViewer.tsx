@@ -14,7 +14,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
   const [isDownloading, setIsDownloading] = useState(false);
   const [isClientExporting, setIsClientExporting] = useState(false);
 
-  // 1. Urutkan soal berdasarkan urutan tipe standar agar penomoran tidak loncat
   const sortedQuestions = useMemo(() => {
     const typeOrder = [
       QuestionType.MCQ,
@@ -28,7 +27,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
     });
   }, [quiz.questions]);
 
-  // 2. Kelompokkan soal yang sudah diurutkan
   const groupedQuestions = useMemo(() => {
     const groups: Record<string, Question[]> = {};
     sortedQuestions.forEach(q => {
@@ -74,32 +72,57 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
 
     setIsClientExporting(true);
     
-    // Perbaikan: Tunggu rendering selesai
-    await new Promise(r => setTimeout(r, 800));
+    // Reset scroll ke atas agar html2canvas tidak salah hitung offset
+    const container = document.querySelector('.print-scroll-container');
+    if (container) container.scrollTop = 0;
+
+    await new Promise(r => setTimeout(r, 1000));
     await triggerMathJax('quiz-print-area');
     
     const opt = {
-      margin: [10, 10, 10, 10], // Atur margin agar tidak mepet
+      margin: [10, 10, 10, 10],
       filename: `${exportMode.toUpperCase()}_${quiz.title.replace(/\s+/g, '_')}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      // html2canvas diperkuat: Hilangkan blur dari capture & pastikan background putih
       html2canvas: { 
         scale: 2, 
         useCORS: true, 
         letterRendering: true,
-        backgroundColor: '#ffffff', // Paksa background putih
+        backgroundColor: '#ffffff',
         logging: false,
         onclone: (clonedDoc: Document) => {
-          // Hapus semua elemen modal wrapper yang punya backdrop blur di dokumen clone
-          const modalWrapper = clonedDoc.querySelector('.print-modal-wrapper');
-          if (modalWrapper) {
-            (modalWrapper as HTMLElement).style.backdropFilter = 'none';
-            (modalWrapper as HTMLElement).style.background = '#ffffff';
+          // STRATEGI ANTI-BLACK-PDF:
+          // 1. Cari elemen utama di dokumen kloning
+          const area = clonedDoc.getElementById('quiz-print-area');
+          if (area) {
+            area.style.backgroundColor = '#ffffff';
+            area.style.color = '#000000';
+            area.style.margin = '0';
+            area.style.padding = '20mm';
+            area.style.boxShadow = 'none';
+          }
+          
+          // 2. Bersihkan filter blur dan transparansi yang bikin canvas jadi hitam
+          const allElements = clonedDoc.getElementsByTagName("*");
+          for (let i = 0; i < allElements.length; i++) {
+            const el = allElements[i] as HTMLElement;
+            el.style.backdropFilter = 'none';
+            el.style.filter = 'none';
+            el.style.transition = 'none';
+            el.style.animation = 'none';
+            
+            // Hilangkan background semi-transparan pada modal wrapper di clone
+            if (el.classList.contains('print-modal-wrapper')) {
+              el.style.background = '#ffffff';
+            }
           }
         }
       },
       jsPDF: { unit: 'mm', format: 'a4', orientation: exportMode === 'kisi-kisi' ? 'landscape' : 'portrait' },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      pagebreak: { 
+        mode: ['avoid-all', 'css', 'legacy'],
+        before: '.type-header', // Paksa halaman baru sebelum ganti tipe soal jika perlu
+        avoid: ['.pdf-header-group', '.pdf-block', 'tr', 'mjx-container'] 
+      }
     };
 
     try {
@@ -141,13 +164,12 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
     }
   };
 
-  // Variable untuk melacak nomor urut global saat mapping
   let globalIndex = 0;
 
   return (
-    <div className="fixed inset-0 bg-white md:bg-orange-50/98 backdrop-blur-3xl z-[500] flex flex-col p-4 md:p-8 animate-in zoom-in-95 duration-300 print-modal-wrapper" role="dialog">
+    <div className="fixed inset-0 bg-white md:bg-gray-900/60 backdrop-blur-3xl z-[500] flex flex-col p-4 md:p-8 animate-in zoom-in-95 duration-300 print-modal-wrapper" role="dialog">
       
-      <header className="flex flex-col lg:flex-row justify-between items-center bg-white p-6 rounded-[2.5rem] shadow-2xl shadow-orange-100/50 mb-8 border border-orange-100 gap-6 no-print">
+      <header className="flex flex-col lg:flex-row justify-between items-center bg-white p-6 rounded-[2.5rem] shadow-2xl shadow-black/10 mb-8 border border-gray-100 gap-6 no-print">
         <div className="flex items-center gap-5">
           <div className="w-14 h-14 orange-gradient rounded-2xl flex items-center justify-center text-white text-3xl shadow-lg">📄</div>
           <div>
@@ -180,21 +202,21 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
       </header>
 
       <div className="flex-1 overflow-y-auto p-0 md:p-12 flex justify-center custom-scrollbar print-scroll-container">
-        {/* Konten Utama - Dibungkus white background solid agar PDF tidak hitam */}
-        <div id="quiz-print-area" className={`bg-white print-container text-gray-900 shadow-none border-none ${exportMode === 'kisi-kisi' ? 'landscape-mode' : ''}`} style={{ backgroundColor: '#ffffff' }}>
+        {/* Background dipaksa putih solid untuk menangani bug 'black pdf' di Chrome */}
+        <div id="quiz-print-area" className={`print-container bg-white text-gray-900 shadow-none border-none ${exportMode === 'kisi-kisi' ? 'landscape-mode' : ''}`} style={{ backgroundColor: '#ffffff', minHeight: '297mm' }}>
           
-          {/* Header Soal dibungkus div agar tidak gampang terpisah */}
-          <div className="pdf-header-group" style={{ pageBreakInside: 'avoid' }}>
-            <div className="text-center mb-1 relative z-10">
+          {/* Header Group: Dibungkus agar tidak terpisah dari soal pertama */}
+          <div className="pdf-header-group" style={{ pageBreakInside: 'avoid', marginBottom: '10mm' }}>
+            <div className="text-center mb-1">
               <h1 className="text-xl font-black m-0 uppercase">NASKAH SOAL EVALUASI HASIL BELAJAR</h1>
               <h2 className="text-lg font-bold m-0 uppercase">{(quiz.subject || '').toUpperCase()} - {(quiz.grade || '').toUpperCase()}</h2>
               <p className="text-[9pt] font-medium text-gray-400 mt-1 uppercase tracking-widest">Kurikulum Merdeka • {quiz.level}</p>
             </div>
             
-            <div className="border-t-[3px] border-b border-black h-[5px] mb-6 relative z-10"></div>
+            <div className="border-t-[3px] border-b border-black h-[5px] mb-6"></div>
 
             {exportMode !== 'kisi-kisi' && (
-              <div className="mb-6 relative z-10">
+              <div className="mb-6">
                 <table className="w-full border-collapse text-[10.5pt]">
                   <tbody>
                     <tr>
@@ -215,7 +237,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
             )}
           </div>
 
-          <div className="space-y-4 relative z-10">
+          <div className="space-y-4">
             {exportMode === 'kisi-kisi' ? (
               <>
                 <div className="text-[11pt] font-black underline uppercase mb-6 text-center">MATRIKS KISI-KISI PENULISAN SOAL</div>
@@ -257,7 +279,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
             ) : (
               (Object.entries(groupedQuestions) as [string, Question[]][]).map(([type, questions], gIdx) => (
                 <div key={type} className="space-y-4">
-                  <div className="bg-gray-100 px-6 py-1.5 border-y-2 border-black font-black text-[11pt] uppercase tracking-tighter" style={{ pageBreakInside: 'avoid' }}>
+                  <div className="type-header bg-gray-100 px-6 py-1.5 border-y-2 border-black font-black text-[11pt] uppercase tracking-tighter" style={{ pageBreakInside: 'avoid' }}>
                     {String.fromCharCode(65 + gIdx)}. {type}
                   </div>
                   
@@ -320,7 +342,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
             )}
           </div>
           
-          <div className="mt-8 pt-2 border-t border-gray-100 text-[8pt] text-gray-400 italic flex justify-between relative z-10 no-print">
+          <div className="mt-8 pt-2 border-t border-gray-100 text-[8pt] text-gray-400 italic flex justify-between no-print">
             <span>GenZ QuizGen Pro - AI Powered Engine v3.1</span>
             <span className="font-bold text-gray-300 select-none">DIGITAL_FINGERPRINT: {(quiz.id || '').toUpperCase()}</span>
           </div>
