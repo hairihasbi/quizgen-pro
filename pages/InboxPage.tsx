@@ -17,8 +17,7 @@ const InboxPage: React.FC<InboxPageProps> = ({ user }) => {
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
-  // Initialized with explicit generic type to ensure consistency
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set<string>());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
   
   const limit = 10;
@@ -68,7 +67,7 @@ const InboxPage: React.FC<InboxPageProps> = ({ user }) => {
     }
     fetchEmails(1, true);
     setPage(1);
-    setSelectedIds(new Set<string>());
+    setSelectedIds(new Set());
   };
 
   const toggleSelect = (e: React.MouseEvent, id: string) => {
@@ -81,7 +80,7 @@ const InboxPage: React.FC<InboxPageProps> = ({ user }) => {
 
   const toggleSelectAll = () => {
     if (selectedIds.size === filteredEmails.length) {
-      setSelectedIds(new Set<string>());
+      setSelectedIds(new Set());
     } else {
       setSelectedIds(new Set(filteredEmails.map(e => e.id)));
     }
@@ -92,13 +91,12 @@ const InboxPage: React.FC<InboxPageProps> = ({ user }) => {
     if (!confirm(`Hapus ${selectedIds.size} pesan terpilih secara permanen?`)) return;
 
     setIsDeleting(true);
-    // Explicitly cast to string[] to resolve TS unknown error from Array.from
-    const idsToDelete = Array.from(selectedIds) as string[];
+    const idsToDelete = Array.from(selectedIds);
     
     try {
       await EmailService.deleteNotifications(idsToDelete);
       setEmails(prev => prev.filter(e => !selectedIds.has(e.id)));
-      setSelectedIds(new Set<string>());
+      setSelectedIds(new Set());
     } catch (e) {
       alert("Gagal menghapus pesan.");
     } finally {
@@ -146,7 +144,7 @@ const InboxPage: React.FC<InboxPageProps> = ({ user }) => {
            </div>
            <div className="flex items-center gap-4">
               <button 
-                onClick={() => setSelectedIds(new Set<string>())}
+                onClick={() => setSelectedIds(new Set())}
                 className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white transition-colors"
               >Batal</button>
               <button 

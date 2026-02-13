@@ -141,8 +141,8 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
   };
 
   const calculateEstimate = () => {
-    const base = formData.model.includes('flash') ? 7 : 10;
-    const textTime = formData.count * (formData.model.includes('flash') ? 2 : 4);
+    const base = formData.model.includes('flash') ? 5 : 8;
+    const textTime = formData.count * (formData.model.includes('flash') ? 1.5 : 3);
     const imageTime = formData.imageQuestionsCount * 7;
     return Math.ceil(base + textTime + imageTime);
   };
@@ -171,7 +171,6 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
     try {
       const gemini = new GeminiService();
       
-      // Tahap RAG: Cari soal serupa untuk pengecekan plagiarisme
       const retrievedContext = await StorageService.findRelatedQuestions(formData.subject, sanitizedTopic);
       
       const result = await gemini.generateQuiz({ 
@@ -257,7 +256,7 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
         timestamp: new Date().toISOString(),
         category: LogCategory.CONTENT,
         action: 'CREATE_QUIZ',
-        details: `Berhasil membuat soal orisinal: ${sanitizedTitle}. Orisinalitas terverifikasi.`,
+        details: `Berhasil membuat soal: ${sanitizedTitle}`,
         status: 'success',
         userId: user.id
       });
@@ -316,11 +315,8 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
               <div className="flex items-center gap-4">
                  <div className="w-14 h-14 orange-gradient rounded-2xl flex items-center justify-center text-white text-3xl shadow-lg" aria-hidden="true">✅</div>
                  <div>
-                    <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">Preview Soal Orisinal</h2>
-                    <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2">
-                       <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                       Plagiarism Check: 100% Unique
-                    </p>
+                    <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">Preview Soal</h2>
+                    <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest">Review & Edit sebelum memotong kredit (1 Kredit).</p>
                  </div>
               </div>
               <div className="flex gap-4 flex-wrap justify-center">
@@ -403,10 +399,6 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
                             <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest ml-4">Penjelasan / Pembahasan</label>
                             <textarea className="w-full px-6 py-4 rounded-[2rem] bg-white border-2 border-emerald-100 focus:border-emerald-500 outline-none text-xs italic h-20" value={editBuffer.explanation} onChange={(e) => setEditBuffer({ ...editBuffer, explanation: e.target.value })} />
                          </div>
-                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-4">Sitasi Grounding (Anti-Halusinasi)</label>
-                            <input className="w-full px-6 py-3 rounded-2xl bg-white border-2 border-blue-100 focus:border-blue-500 outline-none text-[10px] font-black text-blue-700 italic" value={editBuffer.citation || ''} onChange={(e) => setEditBuffer({ ...editBuffer, citation: e.target.value })} placeholder="E.g. Berdasarkan teks referensi, Paragraf 3" />
-                         </div>
                          <div className="flex justify-end gap-3 pt-4">
                             <button onClick={handleCancelEdit} className="px-6 py-2 bg-gray-100 text-gray-400 font-black rounded-xl text-[9px] uppercase hover:bg-gray-200">Batal</button>
                             <button onClick={handleSaveEdit} className="px-8 py-2 bg-emerald-500 text-white font-black rounded-xl text-[9px] uppercase shadow-lg hover:bg-emerald-600">Simpan Perubahan ✅</button>
@@ -415,7 +407,7 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
                     ) : (
                       <div className="space-y-8">
                          {isNewPassage && (
-                           <div className="mb-8 p-1 bg-white rounded-[2.5rem] border-2 border-black shadow-md">
+                           <div className="mb-8 p-1 bg-white rounded-[2.5rem] border-2 border-orange-100 shadow-md">
                              <div className="px-8 py-4 bg-orange-50 rounded-t-[2.2rem] border-b border-orange-100 flex justify-between items-center">
                                 <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">Wacana Stimulus (Grup Soal)</span>
                                 {q.passageHeader && <span className="text-[9px] font-black bg-orange-500 text-white px-3 py-1 rounded-full">{q.passageHeader}</span>}
@@ -444,10 +436,7 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
                          )}
 
                          <div className="mt-6 p-8 bg-emerald-50/50 rounded-[2.5rem] border-2 border-dashed border-emerald-200 text-sm">
-                            <div className="flex justify-between items-center mb-2">
-                               <div className="font-black text-emerald-600 uppercase text-xs">Kunci & Pembahasan</div>
-                               {q.citation && <div className="text-[9px] font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">Sitasi: {q.citation}</div>}
-                            </div>
+                            <div className="font-black text-emerald-600 uppercase mb-2 text-xs">Kunci & Pembahasan</div>
                             <div className="font-bold text-gray-800 mb-2">Jawaban: {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</div>
                             <div className="text-gray-600 italic leading-relaxed" dangerouslySetInnerHTML={{ __html: q.explanation }}></div>
                          </div>
@@ -470,7 +459,7 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
           <div>
             <div className="flex items-center gap-3">
               <h2 className="text-3xl font-black text-gray-900 tracking-tighter">Quiz <span className="text-orange-500">Generator</span></h2>
-              <span className="bg-emerald-50 text-emerald-600 text-[8px] font-black px-3 py-1 rounded-full border border-emerald-100 uppercase tracking-widest animate-pulse">Anti-Plagiarism Active</span>
+              <span className="bg-emerald-50 text-emerald-600 text-[8px] font-black px-3 py-1 rounded-full border border-emerald-100 uppercase tracking-widest animate-pulse">Auto-Save Aktif</span>
             </div>
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Smart Curriculum Engine v3.1</p>
           </div>
