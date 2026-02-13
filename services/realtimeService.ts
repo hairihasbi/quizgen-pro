@@ -93,12 +93,11 @@ export class RealtimeService {
       }, 2000);
     } else {
       emit({ step: 'INITIALIZING', percentage: 5, message: 'Menghubungkan ke Neural Engine...', timestamp: now() }, 200);
-      emit({ step: 'RAG_SCAN', percentage: 15, message: 'Memindai Bank Soal Nasional (RAG)...', details: 'Scanning curriculum vectors for plagiarism prevention', timestamp: now() }, 1000);
-      emit({ step: 'PLAGIARISM_CHECK', percentage: 25, message: 'Verifikasi Orisinalitas Materi...', details: 'Ensuring 100% unique question logic', timestamp: now() }, 2200);
-      emit({ step: 'BATCH_PROCESS', percentage: 50, message: 'Menyusun draf soal yang orisinal...', details: 'Applying Bloom Taxonomy', timestamp: now() }, 4000);
-      emit({ step: 'REFINING', percentage: 75, message: 'Melakukan validasi distractor dan kunci...', details: 'Verifying logical flow', timestamp: now() }, 6500);
-      emit({ step: 'VISUALS', percentage: 90, message: 'Memproses ilustrasi visual...', details: 'Rendering AI stimulus', timestamp: now() }, 8500);
-      emit({ step: 'FINALIZING', percentage: 100, message: 'Finalisasi & Audit Keamanan...', details: 'Orisinalitas terverifikasi 100%', timestamp: now() }, 10000);
+      emit({ step: 'RAG_SCAN', percentage: 15, message: 'Melakukan pemindaian Bank Soal (RAG)...', details: 'Scanning curriculum vectors', timestamp: now() }, 1000);
+      emit({ step: 'BATCH_PROCESS', percentage: 40, message: 'Menyusun draf soal Tahap 1...', details: 'Applying Bloom Taxonomy', timestamp: now() }, 3000);
+      emit({ step: 'REFINING', percentage: 65, message: 'Melakukan validasi distractor dan kunci...', details: 'Verifying logical flow', timestamp: now() }, 5500);
+      emit({ step: 'VISUALS', percentage: 85, message: 'Memproses ilustrasi visual...', details: 'Rendering AI stimulus', timestamp: now() }, 8000);
+      emit({ step: 'FINALIZING', percentage: 100, message: 'Finalisasi struktur dokumen...', details: 'Optimization complete', timestamp: now() }, 10000);
     }
   }
 
