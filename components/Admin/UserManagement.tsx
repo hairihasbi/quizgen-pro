@@ -239,7 +239,7 @@ const UserManagement: React.FC = () => {
                   <td className="px-8 py-6">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600 font-black">
-                        {(u.username || 'U')[0].toUpperCase()}
+                        {u.username[0].toUpperCase()}
                       </div>
                       <div>
                         <div className="font-bold text-gray-800">{u.fullName || u.username}</div>
