@@ -16,8 +16,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({ className, index = 0 }) => (
   </div>
 );
 
-// Added React.FC to allow 'key' prop when mapping in lists
-export const StatSkeleton: React.FC<{ index?: number }> = ({ index = 0 }) => (
+export const StatSkeleton = ({ index = 0 }: { index?: number }) => (
   <div 
     style={{ animationDelay: `${index * 150}ms` }}
     className="bg-white p-8 rounded-[3rem] border border-orange-50 shadow-sm space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700"
@@ -37,8 +36,7 @@ export const StatSkeleton: React.FC<{ index?: number }> = ({ index = 0 }) => (
   </div>
 );
 
-// Added React.FC to allow 'key' prop when mapping in lists
-export const QuizCardSkeleton: React.FC<{ index?: number }> = ({ index = 0 }) => (
+export const QuizCardSkeleton = ({ index = 0 }: { index?: number }) => (
   <div 
     style={{ animationDelay: `${index * 150}ms` }}
     className="bg-white rounded-[3.5rem] p-10 border border-orange-50 shadow-sm space-y-10 animate-in fade-in slide-in-from-bottom-8 duration-700 h-full flex flex-col"
@@ -62,8 +60,7 @@ export const QuizCardSkeleton: React.FC<{ index?: number }> = ({ index = 0 }) =>
   </div>
 );
 
-// Added React.FC to allow 'key' prop when mapping in lists
-export const ListSkeleton: React.FC<{ index?: number }> = ({ index = 0 }) => (
+export const ListSkeleton = ({ index = 0 }: { index?: number }) => (
   <div 
     style={{ animationDelay: `${index * 100}ms` }}
     className="p-8 flex items-center justify-between space-x-6 animate-in fade-in slide-in-from-bottom-2 duration-500"
