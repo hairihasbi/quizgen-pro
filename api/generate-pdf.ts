@@ -6,7 +6,6 @@ export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
   const { quiz, showAnswer, mode } = req.body;
-  if (!quiz) return res.status(400).send('Quiz data missing');
   const isKisiKisi = mode === 'kisi-kisi';
 
   try {
@@ -21,7 +20,6 @@ export default async function handler(req: any, res: any) {
 
     // Mapping Level Kognitif Helper
     const mapLevel = (lvl: string) => {
-      if (!lvl) return '-';
       const l = lvl.toUpperCase();
       if (l.includes('C1') || l.includes('C2')) return 'L1';
       if (l.includes('C3')) return 'L2';
@@ -38,7 +36,7 @@ export default async function handler(req: any, res: any) {
       'Uraian/Essay'
     ];
 
-    const sortedQuestions = [...(quiz.questions || [])].sort((a, b) => {
+    const sortedQuestions = [...quiz.questions].sort((a, b) => {
       return typeOrder.indexOf(a.type) - typeOrder.indexOf(b.type);
     });
 
@@ -156,11 +154,10 @@ export default async function handler(req: any, res: any) {
         <div class="content-wrap">
           <div class="header">
             <h1>NASKAH SOAL EVALUASI HASIL BELAJAR</h1>
-            <h2>${(quiz.subject || '').toUpperCase()} - ${(quiz.grade || '').toUpperCase()}</h2>
+            <h2>${quiz.subject.toUpperCase()} - ${quiz.grade.toUpperCase()}</h2>
           </div>
           <div class="header-line"></div>
 
-          ${!isKisiKisi ? `
           <table class="student-id">
             <tr>
               <td width="15%">Nama Siswa</td><td width="2%">:</td><td class="dot-line">.........................................................</td>
@@ -171,7 +168,6 @@ export default async function handler(req: any, res: any) {
               <td align="right">Waktu</td><td>:</td><td class="dot-line">90 Menit</td>
             </tr>
           </table>
-          ` : ''}
 
           ${isKisiKisi ? `
             <div style="text-align:center; text-decoration:underline; font-weight:800; font-family:'Plus Jakarta Sans'; margin-bottom:20px;">MATRIKS KISI-KISI SOAL</div>
@@ -240,9 +236,14 @@ export default async function handler(req: any, res: any) {
           
           <div class="footer-fingerprint">
             <span>Verified Educational Asset by GenZ QuizGen Pro v3.1</span>
-            <span>Fingerprint: ${(quiz.id || '').toUpperCase()} • Generated on ${new Date().toLocaleDateString()}</span>
+            <span>Fingerprint: ${quiz.id.toUpperCase()} • Generated on ${new Date().toLocaleDateString()}</span>
           </div>
         </div>
+      </div>
+      
+      <!-- INVISIBLE PLAGIARISM MARKER -->
+      <div style="position:fixed; top:0; left:0; width:1px; height:1px; color:rgba(0,0,0,0.01); font-size:1px; overflow:hidden;">
+        SECURE_DOCUMENT_ID:${quiz.id};AUTHOR:${quiz.authorName};DISTRIBUTION_LOCK:ENABLED;
       </div>
     </body>
     </html>
