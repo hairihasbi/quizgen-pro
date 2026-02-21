@@ -19,7 +19,7 @@
                 processEscapes: true 
             },
             svg: { 
-                fontCache: 'none', // WAJIB: Mencegah simbol hilang saat konversi ke PDF
+                fontCache: 'none',
                 minScale: 100,
                 displayAlign: 'left'
             },
@@ -40,10 +40,9 @@
             const container = containerId ? document.getElementById(containerId) : document.body;
             if (!container) return;
             if (window.MathJax && window.MathJax.typesetPromise) {
-                // Gunakan promise untuk memastikan rendering selesai sebelum konfirmasi
                 window.MathJax.typesetPromise([container])
                     .then(() => {
-                        console.log("[MathJax] Typeset complete for", containerId);
+                        console.log("[MathJax] Typeset complete");
                     })
                     .catch(err => console.error("[MathJax] Error:", err));
             }
@@ -53,13 +52,8 @@
     
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #fffaf0; margin: 0; padding: 0; }
-        .font-arabic { font-family: 'Amiri', serif; }
-        .font-jp { font-family: 'Noto Sans JP', sans-serif; }
-        .font-kr { font-family: 'Noto Serif KR', serif; }
-        .font-zh { font-family: 'Noto Sans TC', sans-serif; }
         .orange-gradient { background: linear-gradient(135deg, #ff8c00 0%, #ff4500 100%); }
         
-        /* MathJax Container Fix */
         mjx-container { 
             display: inline-block !important; 
             vertical-align: middle !important; 
@@ -68,25 +62,16 @@
             max-width: 100% !important;
         }
 
-        /* Container Cetak / Preview A4 */
         .print-container {
             width: 210mm !important;
             min-height: 297mm;
-            padding: 22mm !important; 
+            padding: 20mm !important; 
             margin: 0 auto;
             background: white;
             box-sizing: border-box !important;
             position: relative;
             color: black;
             box-shadow: 0 0 50px rgba(0,0,0,0.1);
-            overflow: visible !important;
-        }
-
-        .fixed-table {
-            width: 100% !important;
-            table-layout: fixed !important;
-            border-collapse: collapse !important;
-            box-sizing: border-box !important;
         }
 
         @media print {
@@ -96,40 +81,34 @@
             }
             body { 
                 background: white !important; 
-                overflow: visible !important; 
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
+            /* Sembunyikan semua elemen kecuali modal viewer */
             #root > *:not(.print-modal-wrapper) { display: none !important; }
             .no-print { display: none !important; }
             
             .print-container {
                 width: 210mm !important;
-                padding: 22mm !important;
+                padding: 15mm !important;
                 margin: 0 !important;
                 border: none !important;
                 box-shadow: none !important;
                 display: block !important;
-                page-break-after: always;
             }
 
             .pdf-block {
                 break-inside: avoid !important;
                 page-break-inside: avoid !important;
-                width: 100% !important;
-                display: block !important;
-                margin-bottom: 1.5rem;
+                margin-bottom: 1rem !important;
             }
 
-            table {
-                page-break-inside: auto;
-            }
-            tr {
-                page-break-inside: avoid;
-                page-break-after: auto;
-            }
-            thead {
-                display: table-header-group;
+            img {
+                max-width: 100% !important;
+                height: auto !important;
+                display: block !important;
+                margin: 10px 0 !important;
+                page-break-inside: avoid !important;
             }
         }
 
