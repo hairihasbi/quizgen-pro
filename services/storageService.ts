@@ -1,3 +1,4 @@
+
 import { createClient } from "@libsql/client";
 import { Quiz, User, ApiKey, QuizLog, EmailNotification, UserRole, Transaction, PaymentSettings, PaymentPackage, Question, LogCategory, UserStatus, EmailSettings, GoogleSettings, AISettings } from '../types';
 
@@ -71,7 +72,16 @@ export const StorageService = {
   },
   localGet: (key: string): any => {
     const data = localStorage.getItem(`quizgen_${key}`);
-    try { return data ? JSON.parse(data) : (['api_keys', 'users', 'emails', 'quizzes', 'transactions', 'logs'].includes(key) ? [] : null); } catch (e) { return data; }
+    const listKeys = ['api_keys', 'users', 'emails', 'quizzes', 'transactions', 'logs'];
+    try { 
+      if (!data) return listKeys.includes(key) ? [] : null;
+      const parsed = JSON.parse(data);
+      // Extra safety: if it's supposed to be a list but parsed is not an array
+      if (listKeys.includes(key) && !Array.isArray(parsed)) return [];
+      return parsed;
+    } catch (e) { 
+      return listKeys.includes(key) ? [] : null;
+    }
   },
   localSet: (key: string, value: any) => localStorage.setItem(`quizgen_${key}`, JSON.stringify(value)),
   sanitizeInput: (str: string): string => str ? str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;') : '',
@@ -91,7 +101,7 @@ export const StorageService = {
     if (_client) return _client;
     const config = StorageService.getStoredConfig();
     if (!config.url) return null;
-    try { _client = createClient({ url: config.url, authToken: config.token }); _isLocal = false; return _client; } catch (e) { _isLocal = true; return null; }
+    try { _client = createClient({ url: config.url, authToken: config.token }); _isLocal = false; return _client; } catch (e) { _isLocal = false; return null; }
   },
   init: async () => {
     const client = StorageService.getClient();
@@ -183,7 +193,12 @@ export const StorageService = {
   findRelatedQuestions: async (subject: string, topic: string): Promise<Question[]> => {
     const client = StorageService.getClient();
     if (!client || _isLocal) { const all: Quiz[] = StorageService.localGet('quizzes'); const relevant = all.filter(q => q.subject === subject || q.topic.toLowerCase().includes(topic.toLowerCase())); const questions: Question[] = []; relevant.forEach(rz => { if (rz.questions) questions.push(...rz.questions); }); return questions.sort(() => 0.5 - Math.random()).slice(0, 5); }
-    return [];
+    try { 
+      const res = await client.execute({ sql: "SELECT questions FROM quizzes WHERE subject = ? OR topic LIKE ? LIMIT 5", args: [subject, `%${topic}%`] });
+      const questions: Question[] = [];
+      res.rows.forEach((row: any) => { try { const qs = JSON.parse(row.questions); if (Array.isArray(qs)) questions.push(...qs); } catch(e){} });
+      return questions.slice(0, 5);
+    } catch(e) { return []; }
   },
   addApiKeys: async (keys: string[]) => {
     const local = StorageService.localGet('api_keys');
