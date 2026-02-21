@@ -43,14 +43,12 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
   const [referenceText, setReferenceText] = useState('');
   const [workbenchData, setWorkbenchData] = useState<{questions: Question[], grid: string, tags: string[]} | null>(null);
 
-  // KaTeX Re-render untuk Preview
+  // KaTeX Re-render untuk Preview Workbench
   useEffect(() => {
-    if (workbenchData) {
+    if (workbenchData && (window as any).executeMath) {
       const timer = setTimeout(() => {
-        if ((window as any).renderAllMath) {
-          (window as any).renderAllMath('preview-workbench-area');
-        }
-      }, 500);
+        (window as any).executeMath('preview-workbench-area');
+      }, 600);
       return () => clearTimeout(timer);
     }
   }, [workbenchData]);

@@ -39,9 +39,9 @@ const PublicGallery: React.FC = () => {
 
   // Efek untuk me-render matematika di galeri
   useEffect(() => {
-    if (!loading && allQuizzes.length > 0) {
+    if (!loading && allQuizzes.length > 0 && (window as any).executeMath) {
       const timer = setTimeout(() => {
-        if ((window as any).renderAllMath) (window as any).renderAllMath('gallery-cards-area');
+        (window as any).executeMath('gallery-cards-area');
       }, 600);
       return () => clearTimeout(timer);
     }

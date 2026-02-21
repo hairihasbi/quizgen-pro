@@ -18,9 +18,9 @@ const History: React.FC<HistoryProps> = ({ user }) => {
 
   // Efek untuk me-render matematika di tabel riwayat
   useEffect(() => {
-    if (quizzes.length > 0) {
+    if (quizzes.length > 0 && (window as any).executeMath) {
       const timer = setTimeout(() => {
-        if ((window as any).renderAllMath) (window as any).renderAllMath('history-table-area');
+        (window as any).executeMath('history-table-area');
       }, 500);
       return () => clearTimeout(timer);
     }
