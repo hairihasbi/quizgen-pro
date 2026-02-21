@@ -38,28 +38,27 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
     return groups;
   }, [sortedQuestions]);
 
-  const triggerKaTeX = async () => {
-    if ((window as any).renderAllMath) {
+  const triggerMath = () => {
+    if ((window as any).executeMath) {
       setIsRenderingMath(true);
-      // Panggil global helper yang sudah kita buat di index.html
-      (window as any).renderAllMath('quiz-print-area');
-      
-      // Jeda sangat singkat untuk memastikan painting selesai
-      await new Promise(r => setTimeout(r, 100));
-      setIsRenderingMath(false);
+      // Panggil renderer ke ID spesifik
+      (window as any).executeMath('quiz-print-area');
+      // Matikan loading setelah 500ms (asumsi render selesai)
+      setTimeout(() => setIsRenderingMath(false), 500);
     }
   };
 
   useEffect(() => {
-    // Jalankan render setiap kali quiz atau mode berubah
+    // Jeda 400ms memastikan Modal React sudah terbuka sempurna & DOM tersedia
     const timer = setTimeout(() => {
-      triggerKaTeX();
-    }, 300);
+      triggerMath();
+    }, 400);
     return () => clearTimeout(timer);
   }, [quiz, showAnswer, exportMode]);
 
   const handlePrintDirect = async () => {
-    await triggerKaTeX();
+    triggerMath();
+    await new Promise(r => setTimeout(r, 600)); // Tunggu render visual
     const isLandscape = exportMode === 'kisi-kisi';
     const style = document.createElement('style');
     style.innerHTML = `@page { size: A4 ${isLandscape ? 'landscape' : 'portrait'}; margin: 15mm; }`;
@@ -76,13 +75,10 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
     }
 
     setIsClientExporting(true);
-    const container = document.querySelector('.print-scroll-container');
-    if (container) container.scrollTop = 0;
-
     try {
-      // PROSES KRITIKAL: Pastikan KaTeX me-render segalanya sekali lagi sebelum snapshot
-      await triggerKaTeX();
-      await new Promise(r => setTimeout(r, 1000)); // Tunggu 1 detik untuk kestabilan DOM
+      // PAKSA RENDER SEKALI LAGI SEBELUM SNAPSHOT
+      triggerMath();
+      await new Promise(r => setTimeout(r, 1200)); 
       
       const isLandscape = exportMode === 'kisi-kisi';
       const opt = {
@@ -93,8 +89,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
           scale: 2, 
           useCORS: true,
           letterRendering: true,
-          backgroundColor: '#ffffff',
-          logging: false
+          backgroundColor: '#ffffff'
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: isLandscape ? 'landscape' : 'portrait' },
         pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
@@ -149,7 +144,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
           <div>
             <h2 className="font-black text-gray-800 uppercase text-xs tracking-tight truncate max-w-[280px]">{quiz.title}</h2>
             <div className="text-[9px] font-black text-orange-500 uppercase mt-1 tracking-widest">
-               {isClientExporting ? "PREPARING PDF..." : isRenderingMath ? "RENDERING MATH..." : `${exportMode.toUpperCase()} VIEW`}
+               {isClientExporting ? "PREPARING PDF..." : isRenderingMath ? "CALCULATING MATH..." : `${exportMode.toUpperCase()} VIEW`}
             </div>
           </div>
         </div>
