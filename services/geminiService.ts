@@ -17,12 +17,12 @@ export class GeminiService {
     if (msg.includes("429") || msg.includes("quota")) {
       return "Waduh, otak AI kami sedang 'burnout' karena terlalu banyak permintaan. Tunggu 1 menit ya.";
     }
+    if (msg.includes("requested entity was not found")) {
+      return "Kunci API High-Quality tidak ditemukan atau sudah kadaluarsa. Silakan pilih ulang kunci API Anda.";
+    }
     return "Terjadi kendala misterius saat memproses data. Coba lagi dalam beberapa saat.";
   }
 
-  /**
-   * Pembersih JSON Robust: Mengambil JSON murni dari teks yang mungkin berisi markdown atau teks tambahan.
-   */
   private static extractJson(text: string): any {
     try {
       let cleaned = text.trim();
@@ -217,20 +217,27 @@ export class GeminiService {
     }, externalCall);
   }
 
+  /**
+   * ADAPTIVE VISUAL GENERATOR
+   * 1. Try gemini-2.5-flash-image
+   * 2. Fallback to gemini-3-pro-image-preview
+   */
   async generateVisual(prompt: string): Promise<string> {
-    const externalCall = async (settings: any) => {
-      const cleanUrl = settings.baseUrl.endsWith('/') ? settings.baseUrl.slice(0, -1) : settings.baseUrl;
-      // Many proxies use /images/generations for DALL-E or special model mappings
+    const aiSettings = await StorageService.getAISettings();
+
+    // Logic for LiteLLM / External
+    if (aiSettings.provider === 'external') {
+      const cleanUrl = aiSettings.baseUrl.endsWith('/') ? aiSettings.baseUrl.slice(0, -1) : aiSettings.baseUrl;
       const endpoint = `${cleanUrl}/images/generations`;
       try {
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${settings.customApiKey}`
+            'Authorization': `Bearer ${aiSettings.customApiKey}`
           },
           body: JSON.stringify({
-            model: settings.targetImageModel || "dall-e-3",
+            model: aiSettings.targetImageModel || "gemini-2.5-flash-image",
             prompt: `Professional educational diagram or illustration: ${prompt}`,
             n: 1,
             size: "1024x1024",
@@ -241,34 +248,39 @@ export class GeminiService {
           const data = await response.json();
           return `data:image/png;base64,${data.data[0].b64_json}`;
         }
-        // Fallback to chat completions if image endpoint fails (some proxies use one endpoint for all)
-        const chatEndpoint = `${cleanUrl}/chat/completions`;
-        const chatRes = await fetch(chatEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${settings.customApiKey}`
-          },
-          body: JSON.stringify({
-            model: settings.targetImageModel || "gemini-2.5-flash-image",
-            messages: [{ role: "user", content: `Generate an image for: ${prompt}` }]
-          })
-        });
-        const chatData = await chatRes.json();
-        // Custom logic depending on how the proxy returns images in chat (rare)
         return "";
       } catch (e) { return ""; }
-    };
+    }
 
-    return this.executeTask(async (ai) => {
-      try {
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
-          contents: { parts: [{ text: `Professional educational diagram or illustration: ${prompt}` }] }
-        });
-        const part = response?.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-        return part?.inlineData ? `data:image/png;base64,${part.inlineData.data}` : "";
-      } catch (e) { return ""; }
-    }, externalCall);
+    // Logic for Native with Fallback
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
+    // ATTEMPT 1: FLASH (Fast & Cheap)
+    try {
+      const flashRes = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: { parts: [{ text: `Simple educational illustration for: ${prompt}` }] },
+        config: { imageConfig: { aspectRatio: "1:1" } }
+      });
+      const part = flashRes.candidates[0].content.parts.find(p => p.inlineData);
+      if (part?.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
+    } catch (e) {
+      console.warn("[FLASH_IMAGE_FAILED] Attempting fallback to Pro Engine...");
+    }
+
+    // ATTEMPT 2: PRO (High Quality Fallback)
+    try {
+      const proRes = await ai.models.generateContent({
+        model: 'gemini-3-pro-image-preview',
+        contents: { parts: [{ text: `High quality professional educational diagram or stimulus for: ${prompt}` }] },
+        config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
+      });
+      const part = proRes.candidates[0].content.parts.find(p => p.inlineData);
+      if (part?.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
+    } catch (e) {
+      console.error("[PRO_IMAGE_FAILED] Visual generation completely failed.");
+    }
+
+    return "";
   }
 }
