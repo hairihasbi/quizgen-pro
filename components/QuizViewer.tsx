@@ -15,7 +15,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
   const [isClientExporting, setIsClientExporting] = useState(false);
 
   useEffect(() => {
-    // Force render visual (KaTeX & Images) saat mode berubah
     const timer = setTimeout(() => {
         if ((window as any).executeMath) {
             (window as any).executeMath(document.getElementById('quiz-print-area'));
@@ -40,28 +39,45 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
     if (!element) return;
     setIsClientExporting(true);
     
-    // Memberi waktu tambahan bagi Puppeteer/html2pdf untuk menangkap gambar base64
-    await new Promise(r => setTimeout(r, 1500));
-
-    const isLandscape = exportMode === 'kisi-kisi';
-    const opt = {
-      margin: [10, 10, 10, 10],
-      filename: `${quiz.title.replace(/\s+/g, '_')}_GenZ.pdf`,
-      image: { type: 'jpeg', quality: 1 },
-      html2canvas: { 
-        scale: 2, 
-        useCORS: true, 
-        letterRendering: true,
-        allowTaint: true,
-        logging: false
-      },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: isLandscape ? 'landscape' : 'portrait' }
-    };
-
     try {
+      // 1. Tunggu KaTeX Render
+      if ((window as any).executeMath) (window as any).executeMath(element);
+      
+      // 2. KRUSIAL: Pastikan semua gambar terload & ter-decode
+      const images = element.getElementsByTagName('img');
+      const imagePromises = Array.from(images).map(img => {
+        if (img.complete) return img.decode();
+        return new Promise((resolve) => {
+          img.onload = () => img.decode().then(resolve).catch(resolve);
+          img.onerror = resolve;
+        });
+      });
+      
+      await Promise.all(imagePromises);
+      // Berikan buffer waktu tambahan agar DOM stabil
+      await new Promise(r => setTimeout(r, 1000));
+
+      const isLandscape = exportMode === 'kisi-kisi';
+      const opt = {
+        margin: [10, 10, 10, 10],
+        filename: `${quiz.title.replace(/\s+/g, '_')}_GenZ.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { 
+          scale: 2, 
+          useCORS: true, 
+          letterRendering: true,
+          scrollY: 0,
+          scrollX: 0,
+          windowWidth: element.clientWidth,
+          logging: false
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: isLandscape ? 'landscape' : 'portrait' }
+      };
+
       await (window as any).html2pdf().set(opt).from(element).save();
     } catch (e) {
       console.error("PDF Export Fail:", e);
+      alert("Gagal mengunduh PDF. Pastikan koneksi stabil.");
     } finally {
       setIsClientExporting(false);
     }
