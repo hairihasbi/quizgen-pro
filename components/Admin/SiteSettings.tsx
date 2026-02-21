@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { StorageService } from '../../services/storageService';
 import { AISettings } from '../../types';
@@ -21,7 +22,8 @@ const SiteSettings: React.FC = () => {
     provider: 'native',
     baseUrl: '',
     customApiKey: '',
-    targetModel: 'gemini-3-pro-preview'
+    targetModel: 'gemini-3-pro-preview',
+    targetImageModel: 'gemini-2.5-flash-image'
   });
   const [isEnvManaged, setIsEnvManaged] = useState(false);
   const [showAiKey, setShowAiKey] = useState(false);
@@ -155,15 +157,27 @@ const SiteSettings: React.FC = () => {
                           </button>
                         </div>
                       </div>
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Target Model ID</label>
-                        <input 
-                          type="text" 
-                          className="w-full px-4 py-3 rounded-xl border bg-white text-[11px] font-mono outline-none focus:border-blue-500" 
-                          placeholder="gemini-3-pro-preview"
-                          value={aiSettings.targetModel}
-                          onChange={e => setAiSettings({...aiSettings, targetModel: e.target.value})}
-                        />
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Text Model ID</label>
+                          <input 
+                            type="text" 
+                            className="w-full px-4 py-3 rounded-xl border bg-white text-[11px] font-mono outline-none focus:border-blue-500" 
+                            placeholder="gemini-3-pro-preview"
+                            value={aiSettings.targetModel}
+                            onChange={e => setAiSettings({...aiSettings, targetModel: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Image Model ID</label>
+                          <input 
+                            type="text" 
+                            className="w-full px-4 py-3 rounded-xl border bg-white text-[11px] font-mono outline-none focus:border-blue-500" 
+                            placeholder="dall-e-3"
+                            value={aiSettings.targetImageModel || ''}
+                            onChange={e => setAiSettings({...aiSettings, targetImageModel: e.target.value})}
+                          />
+                        </div>
                       </div>
                    </div>
                  )}
