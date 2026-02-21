@@ -57,19 +57,9 @@ export default async function handler(req: any, res: any) {
     <html lang="id">
     <head>
       <meta charset="UTF-8">
-      <script>
-        window.MathJax = {
-          tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
-          svg: { fontCache: 'none' },
-          startup: {
-            ready: () => {
-              MathJax.startup.defaultReady();
-              window.mathjaxReady = MathJax.typesetPromise();
-            }
-          }
-        };
-      </script>
-      <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+      <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+      <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&family=Noto+Serif:ital,wght@0,400;0,700;1,400&display=swap');
         body { font-family: 'Noto Serif', serif; margin: 0; padding: 0; background: white; color: black; line-height: 1.4; }
@@ -91,12 +81,11 @@ export default async function handler(req: any, res: any) {
         .kisi-table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
         .kisi-table th, .kisi-table td { border: 1px solid black; padding: 6px; vertical-align: top; }
         .kisi-table th { background: #eeeeee; font-weight: 800; text-align: center; }
-        mjx-container { display: inline-block !important; vertical-align: middle; margin: 0 2px !important; }
         .footer { margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px; font-size: 7pt; color: #999; display: flex; justify-content: space-between; font-style: italic; }
       </style>
     </head>
     <body>
-      <div class="page">
+      <div id="pdf-root" class="page">
         <div class="header">
           <h1>NASKAH SOAL EVALUASI HASIL BELAJAR</h1>
           <h2>${(quiz.subject || '').toUpperCase()} - ${(quiz.grade || '').toUpperCase()}</h2>
@@ -159,15 +148,26 @@ export default async function handler(req: any, res: any) {
           <span>Fingerprint: ${(quiz.id || '').toUpperCase()}</span>
         </div>
       </div>
+      <script>
+        document.addEventListener("DOMContentLoaded", function() {
+          renderMathInElement(document.body, {
+            delimiters: [
+              {left: '$$', right: '$$', display: true},
+              {left: '$', right: '$', display: false},
+              {left: '\\(', right: '\\)', display: false},
+              {left: '\\[', right: '\\]', display: true}
+            ],
+            throwOnError: false
+          });
+        });
+      </script>
     </body>
     </html>
     `;
 
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-    await page.evaluate(async () => {
-      if ((window as any).mathjaxReady) await (window as any).mathjaxReady;
-    });
-    await new Promise(r => setTimeout(r, 2000));
+    // Jeda 1 detik untuk memastikan KaTeX selesai rendering di Puppeteer
+    await new Promise(r => setTimeout(r, 1000));
     const pdfBuffer = await page.pdf({ format: 'A4', landscape: isKisiKisi, printBackground: true });
     await browser.close();
     res.setHeader('Content-Type', 'application/pdf');
