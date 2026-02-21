@@ -20,31 +20,14 @@
             },
             svg: { 
                 fontCache: 'none',
-                minScale: 100,
                 displayAlign: 'left'
             },
             options: { 
-                enableMenu: false, 
-                processHtmlClass: 'mjx-item', 
+                enableMenu: false,
                 ignoreHtmlClass: 'tex2jax_ignore' 
             },
             startup: { 
-                typeset: false, 
-                ready: () => { 
-                    MathJax.startup.defaultReady(); 
-                } 
-            }
-        };
-
-        window.observeMathItems = (containerId) => {
-            const container = containerId ? document.getElementById(containerId) : document.body;
-            if (!container) return;
-            if (window.MathJax && window.MathJax.typesetPromise) {
-                window.MathJax.typesetPromise([container])
-                    .then(() => {
-                        console.log("[MathJax] Typeset complete");
-                    })
-                    .catch(err => console.error("[MathJax] Error:", err));
+                typeset: true
             }
         };
     </script>
@@ -59,7 +42,6 @@
             vertical-align: middle !important; 
             margin: 0 0.1em !important; 
             line-height: 0 !important;
-            max-width: 100% !important;
         }
 
         .print-container {
