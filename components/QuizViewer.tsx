@@ -37,23 +37,27 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
     return groups;
   }, [sortedQuestions]);
 
-  const triggerMathJax = async (elementId: string) => {
-    const el = document.getElementById(elementId);
-    if (el && (window as any).MathJax && (window as any).MathJax.typesetPromise) {
+  const triggerMathJax = async () => {
+    if ((window as any).MathJax?.typesetPromise) {
       try {
-        await (window as any).MathJax.typesetPromise([el]);
-      } catch (err) {}
+        await (window as any).MathJax.typesetPromise();
+      } catch (err) {
+        console.warn("MathJax Typeset Failed:", err);
+      }
     }
   };
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      triggerMathJax('quiz-print-area');
-    }, 500);
+      triggerMathJax();
+    }, 300);
     return () => clearTimeout(timer);
   }, [quiz, showAnswer, exportMode]);
 
-  const handlePrintDirect = () => {
+  const handlePrintDirect = async () => {
+    // Pastikan matematika dirender sebelum dialog cetak muncul
+    await triggerMathJax();
+    
     const isLandscape = exportMode === 'kisi-kisi';
     const style = document.createElement('style');
     style.innerHTML = `@page { size: A4 ${isLandscape ? 'landscape' : 'portrait'}; margin: 15mm; }`;
@@ -77,8 +81,11 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
     const container = document.querySelector('.print-scroll-container');
     if (container) container.scrollTop = 0;
 
-    // Tunggu render visual (gambar + rumus)
-    await new Promise(r => setTimeout(r, 1500));
+    // CRITICAL: Paksa render MathJax dan tunggu hasilnya selesai
+    await triggerMathJax();
+    
+    // Beri jeda kecil untuk stabilitas DOM
+    await new Promise(r => setTimeout(r, 1200));
     
     const isLandscape = exportMode === 'kisi-kisi';
     
