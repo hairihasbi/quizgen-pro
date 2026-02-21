@@ -1,4 +1,3 @@
-
 // @google/genai senior frontend engineer fixes
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, QuestionType } from "../types";

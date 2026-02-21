@@ -1,4 +1,3 @@
-
 import { createClient } from "@libsql/client";
 import { Quiz, User, ApiKey, QuizLog, EmailNotification, UserRole, Transaction, PaymentSettings, PaymentPackage, Question, LogCategory, UserStatus, EmailSettings, GoogleSettings, AISettings } from '../types';
 
