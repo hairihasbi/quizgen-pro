@@ -75,7 +75,7 @@ export class GeminiService {
     3. Benar/Salah: Opsi A: Benar, Opsi B: Salah.
     4. Isian/Essay: Field 'options' harus KOSONG atau NULL.
     5. JANGAN PERNAH meniru daftar soal eksisting yang diberikan.
-    ${isEksakta ? "6. Gunakan LaTeX $ ... $ untuk rumus." : ""}`;
+    ${isEksakta ? "6. MATEMATIKA/SAINS: Gunakan LaTeX standar diapit simbol dollar: $ ... $ untuk inline, dan $$ ... $$ untuk baris baru. CONTOH: $\\int (6x^2 - 4x + 3) dx$. JANGAN gunakan double backslash berlebihan yang merusak JSON." : ""}`;
     if (hasReference) instruction += `\n7. Setiap soal WAJIB ada 'citation' dari materi referensi.`;
     if (literacyMode !== 'Tanpa Wacana') instruction += `\n8. Buat wacana/stimulus minimal 200 kata di field 'passage'.`;
     return instruction;
@@ -217,15 +217,9 @@ export class GeminiService {
     }, externalCall);
   }
 
-  /**
-   * ADAPTIVE VISUAL GENERATOR
-   * 1. Try gemini-2.5-flash-image
-   * 2. Fallback to gemini-3-pro-image-preview
-   */
   async generateVisual(prompt: string): Promise<string> {
     const aiSettings = await StorageService.getAISettings();
 
-    // Logic for LiteLLM / External
     if (aiSettings.provider === 'external') {
       const cleanUrl = aiSettings.baseUrl.endsWith('/') ? aiSettings.baseUrl.slice(0, -1) : aiSettings.baseUrl;
       const endpoint = `${cleanUrl}/images/generations`;
@@ -252,10 +246,8 @@ export class GeminiService {
       } catch (e) { return ""; }
     }
 
-    // Logic for Native with Fallback
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    // ATTEMPT 1: FLASH (Fast & Cheap)
     try {
       const flashRes = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
@@ -276,7 +268,6 @@ export class GeminiService {
       console.warn("[FLASH_IMAGE_FAILED] Attempting fallback to Pro Engine...");
     }
 
-    // ATTEMPT 2: PRO (High Quality Fallback)
     try {
       const proRes = await ai.models.generateContent({
         model: 'gemini-3-pro-image-preview',
