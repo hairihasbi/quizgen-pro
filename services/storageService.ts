@@ -1,6 +1,6 @@
 
 import { createClient } from "@libsql/client";
-import { Quiz, User, ApiKey, QuizLog, EmailNotification, UserRole, Transaction, PaymentSettings, PaymentPackage, Question, LogCategory, UserStatus, EmailSettings, GoogleSettings } from '../types';
+import { Quiz, User, ApiKey, QuizLog, EmailNotification, UserRole, Transaction, PaymentSettings, PaymentPackage, Question, LogCategory, UserStatus, EmailSettings, GoogleSettings, AISettings } from '../types';
 
 let _client: any = null;
 let _isLocal = true;
@@ -115,7 +115,8 @@ export const StorageService = {
         `CREATE TABLE IF NOT EXISTS emails (id TEXT PRIMARY KEY, to_addr TEXT, subject TEXT, body TEXT, type TEXT, timestamp TEXT, isRead INTEGER)`,
         `CREATE TABLE IF NOT EXISTS payment_settings (id TEXT PRIMARY KEY, data TEXT)`,
         `CREATE TABLE IF NOT EXISTS email_settings (id TEXT PRIMARY KEY, data TEXT)`,
-        `CREATE TABLE IF NOT EXISTS google_settings (id TEXT PRIMARY KEY, data TEXT)`
+        `CREATE TABLE IF NOT EXISTS google_settings (id TEXT PRIMARY KEY, data TEXT)`,
+        `CREATE TABLE IF NOT EXISTS ai_settings (id TEXT PRIMARY KEY, data TEXT)`
       ], "write");
       const userCheck = await client.execute("SELECT COUNT(*) as count FROM users");
       if (Number(userCheck.rows[0].count) === 0) {
@@ -130,22 +131,35 @@ export const StorageService = {
     const client = StorageService.getClient();
     if (!client || _isLocal) return;
     try {
-      const [resKeys, resUsers, resPayment, resEmails, resQuizzes, resTrx, resEmailSettings, resGoogle] = await Promise.all([
+      const [resKeys, resUsers, resPayment, resEmails, resQuizzes, resTrx, resEmailSettings, resGoogle, resAI] = await Promise.all([
         client.execute("SELECT * FROM api_keys"), client.execute("SELECT id, username, fullName, role, credits, isActive, email, status, password, createdAt FROM users"),
         client.execute("SELECT * FROM payment_settings WHERE id = 'global'"), client.execute("SELECT * FROM emails ORDER BY timestamp DESC LIMIT 50"),
         client.execute("SELECT * FROM quizzes ORDER BY createdAt DESC"), client.execute("SELECT * FROM transactions ORDER BY createdAt DESC LIMIT 50"),
-        client.execute("SELECT * FROM email_settings WHERE id = 'global'"), client.execute("SELECT * FROM google_settings WHERE id = 'global'")
+        client.execute("SELECT * FROM email_settings WHERE id = 'global'"), client.execute("SELECT * FROM google_settings WHERE id = 'global'"),
+        client.execute("SELECT * FROM ai_settings WHERE id = 'global'")
       ]);
       StorageService.localSet('api_keys', resKeys.rows.map((row: any) => ({ id: row.id, key: row.key, usageCount: Number(row.usage_count), lastUsed: row.last_used, isActive: Boolean(row.isActive), errorCount: Number(row.error_count || 0), lastErrorAt: row.last_error_at })));
       StorageService.localSet('users', resUsers.rows.map((row: any) => ({ id: row.id, username: row.username, fullName: row.fullName, role: row.role as UserRole, credits: Number(row.credits), isActive: Boolean(row.isActive), email: row.email, status: row.status as UserStatus, password: row.password, createdAt: row.createdAt })));
       if (resPayment.rows.length > 0) localStorage.setItem('quizgen_payment_settings', resPayment.rows[0].data as string);
       if (resEmailSettings.rows.length > 0) localStorage.setItem('quizgen_email_settings', resEmailSettings.rows[0].data as string);
       if (resGoogle.rows.length > 0) localStorage.setItem('quizgen_google_settings', resGoogle.rows[0].data as string);
+      if (resAI.rows.length > 0) localStorage.setItem('quizgen_ai_settings', resAI.rows[0].data as string);
       StorageService.localSet('emails', resEmails.rows.map((row: any) => ({ id: row.id, to: row.to_addr, subject: row.subject, body: row.body, type: row.type, timestamp: row.timestamp, isRead: Boolean(row.isRead) })));
       StorageService.localSet('quizzes', resQuizzes.rows.map((row: any) => ({ id: row.id, title: row.title, subject: row.subject, level: row.level, grade: row.grade, topic: row.topic, subTopic: row.subTopic, difficulty: row.difficulty, questions: JSON.parse(row.questions), grid: row.grid, tags: row.tags ? JSON.parse(row.tags) : [], authorId: row.authorId, authorName: row.authorName, isPublished: Boolean(row.isPublished), createdAt: row.createdAt, status: row.status })));
       StorageService.localSet('transactions', resTrx.rows.map((row: any) => ({ id: row.id, userId: row.userId, amount: Number(row.amount), credits: Number(row.credits), status: row.status, externalId: row.externalId, createdAt: row.createdAt })));
       localStorage.setItem('quizgen_last_sync', new Date().toISOString());
     } catch(e) {}
+  },
+  getAISettings: async (): Promise<AISettings> => {
+    const local = localStorage.getItem('quizgen_ai_settings');
+    return local ? JSON.parse(local) : { provider: 'native', baseUrl: '', customApiKey: '', targetModel: 'gemini-3-pro-preview' };
+  },
+  saveAISettings: async (settings: AISettings) => {
+    localStorage.setItem('quizgen_ai_settings', JSON.stringify(settings));
+    const client = StorageService.getClient();
+    if (client && !_isLocal) {
+      try { await client.execute({ sql: "INSERT OR REPLACE INTO ai_settings (id, data) VALUES ('global', ?)", args: [JSON.stringify(settings)] }); } catch (e) {}
+    }
   },
   getGoogleSettings: async (): Promise<GoogleSettings> => { const local = localStorage.getItem('quizgen_google_settings'); return local ? JSON.parse(local) : { clientId: '' }; },
   saveGoogleSettings: async (settings: GoogleSettings) => { localStorage.setItem('quizgen_google_settings', JSON.stringify(settings)); const client = StorageService.getClient(); if (client && !_isLocal) { try { await client.execute({ sql: "INSERT OR REPLACE INTO google_settings (id, data) VALUES ('global', ?)", args: [JSON.stringify(settings)] }); } catch (e) {} } },
@@ -156,7 +170,6 @@ export const StorageService = {
   },
   getEmailSettings: async (): Promise<EmailSettings> => {
     const local = localStorage.getItem('quizgen_email_settings');
-    // Fix: Added missing 'method' property to match EmailSettings interface
     if (!local) return { provider: 'none', method: 'api', apiKey: '', fromEmail: 'notifications@quizgen.pro', senderName: 'GenZ QuizGen System' };
     const settings = JSON.parse(local);
     if (settings.apiKey && !settings.apiKey.includes('•')) settings.apiKey = StorageService.maskKey(settings.apiKey);
@@ -261,7 +274,6 @@ export const StorageService = {
   },
   getPaymentSettings: async (): Promise<PaymentSettings> => {
     const local = localStorage.getItem('quizgen_payment_settings');
-    // Default 3 packages with direct payment links focus
     return local ? JSON.parse(local) : { mode: 'production', clientId: '', secretKey: '', merchantName: 'GenZ QuizGen Store', callbackUrl: '', packages: [ { id: '1', name: 'Lite Pack', credits: 30, price: 30000, isActive: true, paymentLink: '' }, { id: '2', name: 'Standard Pro', credits: 50, price: 50000, isActive: true, paymentLink: '' }, { id: '3', name: 'Premium Guru', credits: 100, price: 100000, isActive: true, paymentLink: '' } ] };
   },
   savePaymentSettings: async (settings: PaymentSettings) => { localStorage.setItem('quizgen_payment_settings', JSON.stringify(settings)); const client = StorageService.getClient(); if (client && !_isLocal) { try { await client.execute({ sql: "INSERT OR REPLACE INTO payment_settings (id, data) VALUES ('global', ?)", args: [JSON.stringify(settings)] }); } catch(e){} } },
@@ -350,7 +362,7 @@ export const StorageService = {
   },
   exportFullBackup: async () => {
     const backup: Record<string, any> = {};
-    const keys = ['api_keys', 'users', 'emails', 'quizzes', 'transactions', 'logs', 'payment_settings', 'google_settings'];
+    const keys = ['api_keys', 'users', 'emails', 'quizzes', 'transactions', 'logs', 'payment_settings', 'google_settings', 'ai_settings'];
     keys.forEach(key => backup[key] = StorageService.localGet(key));
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
