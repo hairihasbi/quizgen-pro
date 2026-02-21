@@ -93,7 +93,7 @@ export class GeminiService {
     try {
       const res = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
-        contents: { parts: [{ text: `Professional educational vector illustration, white background, high contrast: ${prompt}` }] }
+        contents: { parts: [{ text: `A clean, high-contrast educational illustration for classroom test. Black and white or simple colors. Minimalist style. Content: ${prompt}` }] }
       });
       
       const candidate = res.candidates?.[0];
