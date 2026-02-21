@@ -263,8 +263,10 @@ export class GeminiService {
         config: { imageConfig: { aspectRatio: "1:1" } }
       });
       
-      if (flashRes.candidates && flashRes.candidates.length > 0) {
-        for (const part of flashRes.candidates[0].content.parts) {
+      const candidate = flashRes.candidates?.[0];
+      const parts = candidate?.content?.parts;
+      if (parts) {
+        for (const part of parts) {
           if (part.inlineData) {
             return `data:image/png;base64,${part.inlineData.data}`;
           }
@@ -282,8 +284,10 @@ export class GeminiService {
         config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
       });
       
-      if (proRes.candidates && proRes.candidates.length > 0) {
-        for (const part of proRes.candidates[0].content.parts) {
+      const candidate = proRes.candidates?.[0];
+      const parts = candidate?.content?.parts;
+      if (parts) {
+        for (const part of parts) {
           if (part.inlineData) {
             return `data:image/png;base64,${part.inlineData.data}`;
           }
