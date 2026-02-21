@@ -1,3 +1,4 @@
+
 export enum UserRole {
   ADMIN = 'admin',
   TEACHER = 'teacher'
@@ -70,6 +71,7 @@ export interface AISettings {
   baseUrl: string;
   customApiKey: string;
   targetModel: string;
+  targetImageModel?: string; // New field for External Image Generator
 }
 
 export interface AIProgressEvent {
