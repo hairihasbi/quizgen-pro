@@ -37,58 +37,65 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
   const handleExportPdfClient = async () => {
     const element = document.getElementById('quiz-print-area');
     if (!element) return;
+    
     setIsClientExporting(true);
     
     try {
-      // 1. Pastikan matematika ter-render
+      // 1. Render Ulang Matematika
       if ((window as any).executeMath) (window as any).executeMath(element);
       
-      // 2. TUNGGU GAMBAR: Pastikan semua gambar ter-load & ter-decode di level browser
+      // 2. Pastikan Gambar Base64 Ter-decode Sempurna
       const images = Array.from(element.getElementsByTagName('img'));
-      const imagePromises = images.map(img => {
+      await Promise.all(images.map(img => {
         if (img.complete) return img.decode().catch(() => {});
         return new Promise((resolve) => {
           img.onload = () => img.decode().then(resolve).catch(resolve);
           img.onerror = resolve;
         });
-      });
-      
-      await Promise.all(imagePromises);
-      
-      // Berikan waktu ekstra bagi browser untuk sinkronisasi layer grafis
-      await new Promise(r => setTimeout(r, 1500));
+      }));
+
+      // Berikan jeda pendek untuk stabilitas layout
+      await new Promise(r => setTimeout(r, 800));
 
       const isLandscape = exportMode === 'kisi-kisi';
       
       const opt = {
-        margin: [15, 12, 15, 12], // Margin yang lebih aman (Atas, Kiri, Bawah, Kanan)
+        margin: [15, 15, 15, 15], // Margin seimbang (Atas, Kiri, Bawah, Kanan)
         filename: `${quiz.title.replace(/\s+/g, '_')}_GenZ.pdf`,
-        image: { type: 'jpeg', quality: 1.0 },
+        image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { 
-          scale: 2.5, // Menaikkan skala untuk ketajaman gambar & rumus
+          scale: 2, // Skala 2 sudah sangat cukup untuk cetak A4
           useCORS: true, 
-          letterRendering: true,
           allowTaint: true,
-          scrollY: 0,
+          letterRendering: true,
+          // FIX KOORDINAT: Mencegah teks terpotong di kiri (ALUASI -> EVALUASI)
           scrollX: 0,
-          windowWidth: 1024, // Memaksa lebar virtual agar layout konsisten
-          logging: false
+          scrollY: 0,
+          x: 0,
+          y: 0,
+          windowWidth: isLandscape ? 1123 : 794, // Presisi A4 px (96 DPI)
+          imageTimeout: 0,
+          logging: false,
+          backgroundColor: '#ffffff'
         },
         jsPDF: { 
           unit: 'mm', 
           format: 'a4', 
           orientation: isLandscape ? 'landscape' : 'portrait',
-          compress: true
+          compress: true 
         },
-        // Mencegah konten terpotong secara vertikal
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        pagebreak: { 
+            mode: ['avoid-all', 'css', 'legacy'],
+            before: '.page-break-before'
+        }
       };
 
-      // Eksekusi library html2pdf
+      // Jalankan Konversi
       await (window as any).html2pdf().set(opt).from(element).save();
+      
     } catch (e) {
       console.error("PDF Export Fail:", e);
-      alert("Gagal mengunduh PDF. Pastikan gambar sudah muncul sepenuhnya di layar sebelum klik export.");
+      alert("Gagal mengunduh. Pastikan semua gambar sudah tampil di layar sebelum klik download.");
     } finally {
       setIsClientExporting(false);
     }
@@ -97,7 +104,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
   let globalIndex = 0;
 
   return (
-    <div className="fixed inset-0 bg-gray-950/80 backdrop-blur-2xl z-[500] flex flex-col p-4 md:p-8 animate-in zoom-in-95 duration-300 print-modal-wrapper" role="dialog">
+    <div className="fixed inset-0 bg-gray-950/90 backdrop-blur-3xl z-[500] flex flex-col p-4 md:p-8 animate-in zoom-in-95 duration-300 print-modal-wrapper" role="dialog">
       <header className="flex flex-col lg:flex-row justify-between items-center bg-white p-6 rounded-[2.5rem] shadow-2xl mb-8 border border-orange-100 gap-6 no-print">
         <div className="flex items-center gap-5">
           <div className="w-14 h-14 orange-gradient rounded-2xl flex items-center justify-center text-white text-3xl shadow-lg">📄</div>
@@ -116,9 +123,9 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
           {!hideDownload && (
             <div className="flex gap-2">
                <button onClick={() => window.print()} className="p-4 bg-gray-100 text-gray-600 rounded-2xl hover:bg-gray-200 transition-all"><Printer size={18} /></button>
-               <button onClick={handleExportPdfClient} disabled={isClientExporting} className="px-8 py-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black shadow-xl hover:bg-orange-600 transition-all flex items-center gap-3 disabled:opacity-50">
+               <button onClick={handleExportPdfClient} disabled={isClientExporting} className="px-8 py-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black shadow-xl hover:bg-orange-600 transition-all flex items-center gap-3 disabled:opacity-50 min-w-[160px] justify-center">
                 {isClientExporting ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
-                {isClientExporting ? 'MEMPROSES...' : 'UNDUH PDF'}
+                {isClientExporting ? 'SEDANG CETAK...' : 'UNDUH PDF'}
                </button>
             </div>
           )}
@@ -126,13 +133,21 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto flex justify-center custom-scrollbar p-0 md:p-8">
-        <div id="quiz-print-area" className={`print-container bg-white shadow-2xl ${exportMode === 'kisi-kisi' ? 'w-[297mm]' : 'w-[210mm]'}`} style={{ color: 'black' }}>
-          {/* KOP SURAT */}
-          <div className="text-center mb-10 border-b-[3px] border-black pb-4">
-            <h1 className="text-2xl font-black uppercase tracking-tighter">NASKAH EVALUASI HASIL BELAJAR</h1>
-            <h2 className="text-lg font-bold uppercase">{quiz.subject} - {quiz.grade}</h2>
-            <p className="text-[10px] font-bold uppercase mt-1 italic">Tahun Pelajaran 2024/2025</p>
+      <div className="flex-1 overflow-y-auto flex justify-center custom-scrollbar p-0 md:p-8 bg-black/20 rounded-[3rem]">
+        {/* CONTAINER UTAMA DENGAN LEBAR TETAP UNTUK PREVIEW YANG AKURAT */}
+        <div 
+          id="quiz-print-area" 
+          className={`print-container bg-white shadow-2xl relative ${exportMode === 'kisi-kisi' ? 'w-[297mm]' : 'w-[210mm]'}`} 
+          style={{ color: 'black', margin: '0 auto' }}
+        >
+          {/* KOP SURAT PROFESIONAL */}
+          <div className="text-center mb-10 border-b-[3.5px] border-black pb-4">
+            <h1 className="text-2xl font-black uppercase tracking-tighter leading-none mb-2">NASKAH EVALUASI HASIL BELAJAR</h1>
+            <h2 className="text-lg font-bold uppercase tracking-tight">{quiz.subject} - {quiz.grade}</h2>
+            <div className="flex justify-between items-end mt-4 px-2">
+                <div className="text-left text-[9pt] font-bold uppercase italic">Tahun Pelajaran 2024/2025</div>
+                <div className="text-right text-[9pt] font-black border-2 border-black px-4 py-1 uppercase tracking-widest">UTAMA</div>
+            </div>
           </div>
 
           <div className="space-y-12">
@@ -171,30 +186,31 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
                 return (
                   <div key={q.id} className="pdf-block mb-10" style={{ pageBreakInside: 'avoid' }}>
                     {isNewPassage && (
-                      <div className="bg-gray-50 border-[1.5px] border-black p-8 mb-8 italic text-sm text-justify leading-relaxed relative">
+                      <div className="bg-gray-50 border-[1.5px] border-black p-8 mb-8 italic text-[10.5pt] text-justify leading-relaxed relative">
                         <div className="absolute top-0 left-6 -translate-y-1/2 bg-white px-3 font-black text-[8pt] border border-black uppercase tracking-widest">Wacana Stimulus</div>
                         <div dangerouslySetInnerHTML={{ __html: q.passage || '' }} />
                       </div>
                     )}
-                    <div className="flex gap-5">
-                       <div className="font-bold text-[11pt] w-6 shrink-0 text-right">{globalIndex}.</div>
+                    <div className="flex gap-4">
+                       <div className="font-bold text-[11pt] w-7 shrink-0 text-right">{globalIndex}.</div>
                        <div className="flex-1">
                           <div className="font-bold text-justify mb-5 text-[11pt] leading-relaxed" dangerouslySetInnerHTML={{ __html: q.text }}></div>
                           
-                          {/* GAMBAR SOAL DENGAN WRAPPER UNTUK MENCEGAH CUT-OFF */}
+                          {/* WRAPPER GAMBAR DENGAN WIDTH TETAP UNTUK MENCEGAH CLIPPING */}
                           {q.image && (
-                             <div className="mb-6 p-2 bg-white border border-gray-200 rounded-2xl inline-block overflow-hidden" style={{ pageBreakInside: 'avoid' }}>
+                             <div className="mb-6 p-1 bg-white inline-block border border-gray-100 rounded-lg shadow-sm overflow-hidden" style={{ maxWidth: '100%' }}>
                                <img 
                                  src={q.image} 
                                  crossOrigin="anonymous"
                                  className="max-w-full md:max-w-md max-h-[75mm] object-contain block" 
-                                 alt="Stimulus Visual" 
+                                 alt="Visual Stimulus" 
+                                 style={{ display: 'block' }}
                                />
                              </div>
                           )}
 
                           {q.options && (
-                            <div className="grid grid-cols-2 gap-x-12 gap-y-3 ml-2">
+                            <div className="grid grid-cols-2 gap-x-12 gap-y-3 ml-1">
                                {q.options.map(opt => (
                                  <div key={opt.label} className="flex gap-4 items-start">
                                     <span className="w-5 h-5 flex items-center justify-center border border-black rounded-full text-[9pt] font-black shrink-0">
@@ -209,7 +225,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
                           {(showAnswer || exportMode === 'lengkap') && (
                             <div className="mt-6 p-6 bg-emerald-50 border-[1.2px] border-dashed border-emerald-400 rounded-3xl text-[10pt] italic shadow-inner" style={{ pageBreakInside: 'avoid' }}>
                                <div className="font-black text-emerald-800 uppercase mb-1 flex items-center gap-2">
-                                  <CheckCircle2 size={14} /> KUNCI: {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}
+                                  <CheckCircle2 size={14} /> JAWABAN: {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}
                                </div>
                                <div className="text-emerald-700 leading-relaxed font-medium" dangerouslySetInnerHTML={{ __html: q.explanation }}></div>
                             </div>
@@ -222,21 +238,28 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
             )}
           </div>
           
-          <div className="mt-20 pt-6 border-t border-gray-100 flex justify-between items-center no-print opacity-30">
-            <div className="text-[9px] font-black uppercase tracking-[0.3em]">GenZ QuizGen Pro Engine v3.1</div>
-            <div className="text-[9px] font-black uppercase tracking-[0.3em]">Signature: {quiz.id.substring(0,8).toUpperCase()}</div>
+          <div className="mt-24 pt-8 border-t border-gray-200 flex justify-between items-center opacity-30 no-print">
+            <div className="text-[8px] font-black uppercase tracking-[0.4em]">GenZ QuizGen Pro Engine v3.1</div>
+            <div className="text-[8px] font-black uppercase tracking-[0.4em]">Auth Sign: {quiz.id.substring(0,12).toUpperCase()}</div>
           </div>
         </div>
       </div>
       
       <style dangerouslySetInnerHTML={{ __html: `
+        @media screen {
+            .print-container {
+                padding: 20mm !important;
+                min-height: 297mm;
+            }
+        }
         @media print {
           .pdf-block { page-break-inside: avoid !important; }
-          img { max-width: 100% !important; height: auto !important; }
+          img { max-width: 100% !important; height: auto !important; display: block !important; }
         }
         .print-container {
           box-sizing: border-box;
-          font-family: 'Noto Serif', serif !important;
+          font-family: 'Plus Jakarta Sans', sans-serif !important;
+          background: white !important;
         }
       `}} />
     </div>
