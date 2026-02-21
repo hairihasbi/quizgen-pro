@@ -1,3 +1,4 @@
+
 // @google/genai senior frontend engineer fixes
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, QuestionType } from "../types";
@@ -176,7 +177,16 @@ export class GeminiService {
 
       const data = await response.json();
       const content = data.choices[0].message.content;
-      return JSON.parse(content);
+      try {
+        const parsed = JSON.parse(content);
+        // Safety Guarantee: Always ensure questions is an array
+        return {
+          questions: Array.isArray(parsed.questions) ? parsed.questions : [],
+          tags: Array.isArray(parsed.tags) ? parsed.tags : []
+        };
+      } catch(e) {
+        return { questions: [], tags: [] };
+      }
     };
 
     return this.executeTask(async (ai) => {
@@ -224,7 +234,17 @@ export class GeminiService {
           }
         }
       });
-      return JSON.parse(response.text || "{}");
+      
+      const rawText = response.text || "{}";
+      try {
+        const parsed = JSON.parse(rawText);
+        return {
+          questions: Array.isArray(parsed.questions) ? parsed.questions : [],
+          tags: Array.isArray(parsed.tags) ? parsed.tags : []
+        };
+      } catch (e) {
+        return { questions: [], tags: [] };
+      }
     }, externalCall);
   }
 
