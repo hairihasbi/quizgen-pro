@@ -11,18 +11,37 @@
     <!-- Library untuk Save PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-    <!-- KaTeX Library (Lebih Ringan & Cepat dari MathJax) -->
+    <!-- KaTeX Library (Versi Stabil) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <script>
+        // Global Helper untuk memudahkan pemanggilan di komponen React manapun
+        window.renderAllMath = function(elementId) {
+            const target = elementId ? document.getElementById(elementId) : document.body;
+            if (window.renderMathInElement && target) {
+                window.renderMathInElement(target, {
+                    delimiters: [
+                        {left: '$$', right: '$$', display: true},
+                        {left: '$', right: '$', display: false},
+                        {left: '\\(', right: '\\)', display: false},
+                        {left: '\\[', right: '\\]', display: true}
+                    ],
+                    throwOnError: false,
+                    trust: true
+                });
+            }
+        };
+    </script>
 
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #fffaf0; margin: 0; padding: 0; }
         .orange-gradient { background: linear-gradient(135deg, #ff8c00 0%, #ff4500 100%); }
         
-        /* KaTeX Adjustment */
-        .katex { font-size: 1.1em !important; }
-        .katex-display { margin: 0.5em 0 !important; overflow-x: auto; overflow-y: hidden; }
+        /* Optimasi Tampilan KaTeX */
+        .katex { font-size: 1.05em !important; }
+        .katex-display { margin: 0.8em 0 !important; overflow-x: auto; overflow-y: hidden; padding: 5px 0; }
 
         .print-container {
             width: 210mm;
