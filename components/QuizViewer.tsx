@@ -40,13 +40,13 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
     setIsClientExporting(true);
     
     try {
-      // 1. Tunggu KaTeX Render
+      // 1. Pastikan matematika ter-render
       if ((window as any).executeMath) (window as any).executeMath(element);
       
-      // 2. KRUSIAL: Pastikan semua gambar terload & ter-decode
-      const images = element.getElementsByTagName('img');
-      const imagePromises = Array.from(images).map(img => {
-        if (img.complete) return img.decode();
+      // 2. TUNGGU GAMBAR: Pastikan semua gambar ter-load & ter-decode di level browser
+      const images = Array.from(element.getElementsByTagName('img'));
+      const imagePromises = images.map(img => {
+        if (img.complete) return img.decode().catch(() => {});
         return new Promise((resolve) => {
           img.onload = () => img.decode().then(resolve).catch(resolve);
           img.onerror = resolve;
@@ -54,30 +54,41 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
       });
       
       await Promise.all(imagePromises);
-      // Berikan buffer waktu tambahan agar DOM stabil
-      await new Promise(r => setTimeout(r, 1000));
+      
+      // Berikan waktu ekstra bagi browser untuk sinkronisasi layer grafis
+      await new Promise(r => setTimeout(r, 1500));
 
       const isLandscape = exportMode === 'kisi-kisi';
+      
       const opt = {
-        margin: [10, 10, 10, 10],
+        margin: [15, 12, 15, 12], // Margin yang lebih aman (Atas, Kiri, Bawah, Kanan)
         filename: `${quiz.title.replace(/\s+/g, '_')}_GenZ.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
+        image: { type: 'jpeg', quality: 1.0 },
         html2canvas: { 
-          scale: 2, 
+          scale: 2.5, // Menaikkan skala untuk ketajaman gambar & rumus
           useCORS: true, 
           letterRendering: true,
+          allowTaint: true,
           scrollY: 0,
           scrollX: 0,
-          windowWidth: element.clientWidth,
+          windowWidth: 1024, // Memaksa lebar virtual agar layout konsisten
           logging: false
         },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: isLandscape ? 'landscape' : 'portrait' }
+        jsPDF: { 
+          unit: 'mm', 
+          format: 'a4', 
+          orientation: isLandscape ? 'landscape' : 'portrait',
+          compress: true
+        },
+        // Mencegah konten terpotong secara vertikal
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
       };
 
+      // Eksekusi library html2pdf
       await (window as any).html2pdf().set(opt).from(element).save();
     } catch (e) {
       console.error("PDF Export Fail:", e);
-      alert("Gagal mengunduh PDF. Pastikan koneksi stabil.");
+      alert("Gagal mengunduh PDF. Pastikan gambar sudah muncul sepenuhnya di layar sebelum klik export.");
     } finally {
       setIsClientExporting(false);
     }
@@ -92,7 +103,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
           <div className="w-14 h-14 orange-gradient rounded-2xl flex items-center justify-center text-white text-3xl shadow-lg">📄</div>
           <div>
             <h2 className="font-black text-gray-800 uppercase text-xs tracking-tight truncate max-w-[280px]">{quiz.title}</h2>
-            <div className="text-[9px] font-black text-orange-500 uppercase mt-1 tracking-widest">{exportMode} VIEW</div>
+            <div className="text-[9px] font-black text-orange-500 uppercase mt-1 tracking-widest">{exportMode} PREVIEW</div>
           </div>
         </div>
         
@@ -107,7 +118,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
                <button onClick={() => window.print()} className="p-4 bg-gray-100 text-gray-600 rounded-2xl hover:bg-gray-200 transition-all"><Printer size={18} /></button>
                <button onClick={handleExportPdfClient} disabled={isClientExporting} className="px-8 py-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black shadow-xl hover:bg-orange-600 transition-all flex items-center gap-3 disabled:opacity-50">
                 {isClientExporting ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
-                CETAK PDF
+                {isClientExporting ? 'MEMPROSES...' : 'UNDUH PDF'}
                </button>
             </div>
           )}
@@ -116,18 +127,18 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
       </header>
 
       <div className="flex-1 overflow-y-auto flex justify-center custom-scrollbar p-0 md:p-8">
-        <div id="quiz-print-area" className={`print-container ${exportMode === 'kisi-kisi' ? 'w-[297mm]' : 'w-[210mm]'}`} style={{ backgroundColor: 'white' }}>
-          <div className="text-center mb-10">
-            <h1 className="text-2xl font-black uppercase underline tracking-tighter">NASKAH EVALUASI HASIL BELAJAR</h1>
+        <div id="quiz-print-area" className={`print-container bg-white shadow-2xl ${exportMode === 'kisi-kisi' ? 'w-[297mm]' : 'w-[210mm]'}`} style={{ color: 'black' }}>
+          {/* KOP SURAT */}
+          <div className="text-center mb-10 border-b-[3px] border-black pb-4">
+            <h1 className="text-2xl font-black uppercase tracking-tighter">NASKAH EVALUASI HASIL BELAJAR</h1>
             <h2 className="text-lg font-bold uppercase">{quiz.subject} - {quiz.grade}</h2>
-            <div className="border-b-[3px] border-black mt-3 h-1"></div>
-            <div className="border-b border-black mt-1"></div>
+            <p className="text-[10px] font-bold uppercase mt-1 italic">Tahun Pelajaran 2024/2025</p>
           </div>
 
           <div className="space-y-12">
             {exportMode === 'kisi-kisi' ? (
               <div className="animate-in fade-in">
-                <div className="text-center font-black text-sm uppercase mb-4 underline">MATRIKS KISI-KISI DAN KUNCI JAWABAN</div>
+                <div className="text-center font-black text-sm uppercase mb-6 underline">MATRIKS KISI-KISI DAN KUNCI JAWABAN</div>
                 <table className="w-full border-collapse border-[1.5px] border-black text-[9pt]">
                    <thead>
                       <tr className="bg-gray-100">
@@ -158,7 +169,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
                 globalIndex++;
                 const isNewPassage = q.passage && (i === 0 || sortedQuestions[i-1].passage !== q.passage);
                 return (
-                  <div key={q.id} className="pdf-block mb-12">
+                  <div key={q.id} className="pdf-block mb-10" style={{ pageBreakInside: 'avoid' }}>
                     {isNewPassage && (
                       <div className="bg-gray-50 border-[1.5px] border-black p-8 mb-8 italic text-sm text-justify leading-relaxed relative">
                         <div className="absolute top-0 left-6 -translate-y-1/2 bg-white px-3 font-black text-[8pt] border border-black uppercase tracking-widest">Wacana Stimulus</div>
@@ -168,22 +179,25 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
                     <div className="flex gap-5">
                        <div className="font-bold text-[11pt] w-6 shrink-0 text-right">{globalIndex}.</div>
                        <div className="flex-1">
-                          <div className="font-bold text-justify mb-6 text-[11pt] leading-relaxed" dangerouslySetInnerHTML={{ __html: q.text }}></div>
+                          <div className="font-bold text-justify mb-5 text-[11pt] leading-relaxed" dangerouslySetInnerHTML={{ __html: q.text }}></div>
+                          
+                          {/* GAMBAR SOAL DENGAN WRAPPER UNTUK MENCEGAH CUT-OFF */}
                           {q.image && (
-                             <div className="mb-8 p-4 bg-white border rounded-3xl shadow-sm inline-block">
+                             <div className="mb-6 p-2 bg-white border border-gray-200 rounded-2xl inline-block overflow-hidden" style={{ pageBreakInside: 'avoid' }}>
                                <img 
                                  src={q.image} 
                                  crossOrigin="anonymous"
-                                 className="max-w-md max-h-[80mm] rounded-2xl block" 
+                                 className="max-w-full md:max-w-md max-h-[75mm] object-contain block" 
                                  alt="Stimulus Visual" 
                                />
                              </div>
                           )}
+
                           {q.options && (
-                            <div className="grid grid-cols-2 gap-x-10 gap-y-4 ml-2">
+                            <div className="grid grid-cols-2 gap-x-12 gap-y-3 ml-2">
                                {q.options.map(opt => (
-                                 <div key={opt.label} className="flex gap-4 items-start group">
-                                    <span className={`w-6 h-6 flex items-center justify-center border-[1.5px] border-black text-[10px] font-black shrink-0 transition-colors ${q.type === QuestionType.COMPLEX_MCQ ? 'rounded-lg bg-gray-50' : 'rounded-full'}`}>
+                                 <div key={opt.label} className="flex gap-4 items-start">
+                                    <span className="w-5 h-5 flex items-center justify-center border border-black rounded-full text-[9pt] font-black shrink-0">
                                        {opt.label}
                                     </span>
                                     <span className="text-[10pt] font-medium leading-snug" dangerouslySetInnerHTML={{ __html: opt.text }}></span>
@@ -191,9 +205,10 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
                                ))}
                             </div>
                           )}
+
                           {(showAnswer || exportMode === 'lengkap') && (
-                            <div className="mt-8 p-8 bg-emerald-50 border-[1.5px] border-dashed border-emerald-300 rounded-[2.5rem] text-[10pt] italic shadow-sm">
-                               <div className="font-black text-emerald-800 uppercase mb-2 flex items-center gap-2">
+                            <div className="mt-6 p-6 bg-emerald-50 border-[1.2px] border-dashed border-emerald-400 rounded-3xl text-[10pt] italic shadow-inner" style={{ pageBreakInside: 'avoid' }}>
+                               <div className="font-black text-emerald-800 uppercase mb-1 flex items-center gap-2">
                                   <CheckCircle2 size={14} /> KUNCI: {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}
                                </div>
                                <div className="text-emerald-700 leading-relaxed font-medium" dangerouslySetInnerHTML={{ __html: q.explanation }}></div>
@@ -208,11 +223,22 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
           </div>
           
           <div className="mt-20 pt-6 border-t border-gray-100 flex justify-between items-center no-print opacity-30">
-            <div className="text-[9px] font-black uppercase tracking-[0.3em]">GenZ QuizGen Pro v3.1 Engine</div>
+            <div className="text-[9px] font-black uppercase tracking-[0.3em]">GenZ QuizGen Pro Engine v3.1</div>
             <div className="text-[9px] font-black uppercase tracking-[0.3em]">Signature: {quiz.id.substring(0,8).toUpperCase()}</div>
           </div>
         </div>
       </div>
+      
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          .pdf-block { page-break-inside: avoid !important; }
+          img { max-width: 100% !important; height: auto !important; }
+        }
+        .print-container {
+          box-sizing: border-box;
+          font-family: 'Noto Serif', serif !important;
+        }
+      `}} />
     </div>
   );
 };
