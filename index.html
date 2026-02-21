@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GenZ QuizGen Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Amiri&family=Noto+Sans+JP&family=Noto+Serif+KR&family=Noto+Sans+TC&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Amiri&family=Noto+Sans+JP&family=Noto+Serif+KR&family=Noto+Sans+TC&display=swap" rel="stylesheet">
     
     <!-- Library untuk Save PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -65,14 +65,13 @@
         .print-container {
             width: 210mm;
             min-height: 297mm;
-            padding: 20mm !important; 
+            padding: 15mm !important; 
             margin: 0 auto;
             background: white;
             box-sizing: border-box !important;
             position: relative;
             color: black;
             box-shadow: 0 0 50px rgba(0,0,0,0.1);
-            transition: width 0.3s ease;
         }
 
         .print-container.landscape-mode {
@@ -81,41 +80,37 @@
         }
 
         @media print {
-            body { background: white !important; }
+            @page { margin: 0; }
+            body { background: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             #root > *:not(.print-modal-wrapper) { display: none !important; }
             .no-print { display: none !important; }
             
             .print-container {
                 width: 100% !important;
-                padding: 10mm !important;
+                padding: 12mm !important;
                 margin: 0 !important;
                 border: none !important;
                 box-shadow: none !important;
                 display: block !important;
             }
 
-            /* Aturan Orientasi Otomatis Berdasarkan Class */
-            .portrait-layout { page: portrait; }
-            .landscape-layout { page: landscape; }
-
-            @page { size: A4 portrait; margin: 0; }
-            .landscape-mode-print { page: landscape; }
-            @page landscape-mode-print { size: A4 landscape; }
-
             .pdf-block {
                 break-inside: avoid !important;
                 page-break-inside: avoid !important;
+                margin-bottom: 1rem !important;
             }
 
             img {
                 max-width: 100% !important;
                 height: auto !important;
                 display: block !important;
+                margin: 10px 0 !important;
                 page-break-inside: avoid !important;
             }
-            
-            table { page-break-inside: auto; }
-            tr { page-break-inside: avoid; page-break-after: auto; }
+
+            table { page-break-inside: auto; width: 100% !important; border-collapse: collapse !important; }
+            tr { page-break-inside: avoid !important; page-break-after: auto !important; }
+            td, th { border: 1px solid black !important; }
         }
 
         .custom-scrollbar::-webkit-scrollbar { width: 8px; }
