@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { Quiz, QuestionType, Question } from '../types';
-import { Printer, Download, Cloud, X, FileText, CheckCircle2, TableProperties } from 'lucide-react';
+import { Printer, Download, Cloud, X, FileText, CheckCircle2, TableProperties, Loader2 } from 'lucide-react';
 
 interface QuizViewerProps {
   quiz: Quiz;
@@ -14,6 +14,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
   const [exportMode, setExportMode] = useState<'soal' | 'kisi-kisi' | 'lengkap'>('soal');
   const [isDownloading, setIsDownloading] = useState(false);
   const [isClientExporting, setIsClientExporting] = useState(false);
+  const [isRenderingMath, setIsRenderingMath] = useState(false);
 
   const sortedQuestions = useMemo(() => {
     const typeOrder = [
@@ -40,7 +41,13 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
   const triggerMathJax = async () => {
     if ((window as any).MathJax?.typesetPromise) {
       try {
-        await (window as any).MathJax.typesetPromise();
+        // Render spesifik pada area print agar lebih efisien
+        const el = document.getElementById('quiz-print-area');
+        if (el) {
+          await (window as any).MathJax.typesetPromise([el]);
+        } else {
+          await (window as any).MathJax.typesetPromise();
+        }
       } catch (err) {
         console.warn("MathJax Typeset Failed:", err);
       }
@@ -50,13 +57,14 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
   useEffect(() => {
     const timer = setTimeout(() => {
       triggerMathJax();
-    }, 300);
+    }, 500);
     return () => clearTimeout(timer);
   }, [quiz, showAnswer, exportMode]);
 
   const handlePrintDirect = async () => {
-    // Pastikan matematika dirender sebelum dialog cetak muncul
+    setIsRenderingMath(true);
     await triggerMathJax();
+    await new Promise(r => setTimeout(r, 1000));
     
     const isLandscape = exportMode === 'kisi-kisi';
     const style = document.createElement('style');
@@ -64,6 +72,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
     document.head.appendChild(style);
     
     window.print();
+    setIsRenderingMath(false);
     
     setTimeout(() => {
       if (style.parentNode) document.head.removeChild(style);
@@ -78,38 +87,43 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
     }
 
     setIsClientExporting(true);
+    setIsRenderingMath(true);
+    
     const container = document.querySelector('.print-scroll-container');
     if (container) container.scrollTop = 0;
 
-    // CRITICAL: Paksa render MathJax dan tunggu hasilnya selesai
-    await triggerMathJax();
-    
-    // Beri jeda kecil untuk stabilitas DOM
-    await new Promise(r => setTimeout(r, 1200));
-    
-    const isLandscape = exportMode === 'kisi-kisi';
-    
-    const opt = {
-      margin: [10, 10, 10, 10],
-      filename: `${quiz.title.replace(/\s+/g, '_')}_${exportMode.toUpperCase()}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { 
-        scale: 2, 
-        useCORS: true,
-        letterRendering: true,
-        backgroundColor: '#ffffff',
-        logging: false
-      },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: isLandscape ? 'landscape' : 'portrait' },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-    };
-
     try {
+      // PROSES PENTING: Paksa render ulang MathJax sebelum snapshot
+      // Kita lakukan 2x untuk memastikan nesting formula ter-render sempurna
+      await triggerMathJax();
+      await new Promise(r => setTimeout(r, 1000));
+      await triggerMathJax();
+      
+      // Jeda ekstra agar browser menyelesaikan painting SVG ke DOM
+      await new Promise(r => setTimeout(r, 2500));
+      
+      const isLandscape = exportMode === 'kisi-kisi';
+      const opt = {
+        margin: [10, 10, 10, 10],
+        filename: `${quiz.title.replace(/\s+/g, '_')}_${exportMode.toUpperCase()}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { 
+          scale: 2, 
+          useCORS: true,
+          letterRendering: true,
+          backgroundColor: '#ffffff',
+          logging: false
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: isLandscape ? 'landscape' : 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      };
+
       await (window as any).html2pdf().set(opt).from(element).save();
     } catch (err: any) {
       alert("Gagal export PDF: " + err.message);
     } finally {
       setIsClientExporting(false);
+      setIsRenderingMath(false);
     }
   };
 
@@ -148,10 +162,14 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
       
       <header className="flex flex-col lg:flex-row justify-between items-center bg-white p-6 rounded-[2.5rem] shadow-2xl mb-8 border border-gray-100 gap-6 no-print">
         <div className="flex items-center gap-5">
-          <div className="w-14 h-14 orange-gradient rounded-2xl flex items-center justify-center text-white text-3xl shadow-lg">📄</div>
+          <div className="w-14 h-14 orange-gradient rounded-2xl flex items-center justify-center text-white text-3xl shadow-lg">
+             {isRenderingMath ? <Loader2 className="animate-spin" size={24} /> : "📄"}
+          </div>
           <div>
             <h2 className="font-black text-gray-800 uppercase text-xs tracking-tight truncate max-w-[280px]">{quiz.title}</h2>
-            <div className="text-[9px] font-black text-orange-500 uppercase mt-1 tracking-widest">{exportMode.toUpperCase()} VIEW</div>
+            <div className="text-[9px] font-black text-orange-500 uppercase mt-1 tracking-widest">
+               {isRenderingMath ? "RENDERING FORMULA..." : `${exportMode.toUpperCase()} VIEW`}
+            </div>
           </div>
         </div>
         
@@ -172,11 +190,12 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
 
           {!hideDownload && (
             <>
-              <button onClick={handlePrintDirect} className="px-6 py-4 bg-emerald-500 text-white rounded-2xl text-[10px] font-black shadow-lg transition-all hover:scale-105 active:scale-95 flex items-center gap-2">
+              <button onClick={handlePrintDirect} disabled={isRenderingMath} className="px-6 py-4 bg-emerald-500 text-white rounded-2xl text-[10px] font-black shadow-lg transition-all hover:scale-105 active:scale-95 flex items-center gap-2 disabled:opacity-50">
                 <Printer size={16} /> CETAK
               </button>
-              <button onClick={handleExportPdfClient} disabled={isClientExporting} className="px-6 py-4 bg-orange-600 text-white rounded-2xl text-[10px] font-black shadow-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex items-center gap-2">
-                <Download size={16} /> {isClientExporting ? "PROSES..." : "PDF INSTAN"}
+              <button onClick={handleExportPdfClient} disabled={isClientExporting || isRenderingMath} className="px-6 py-4 bg-orange-600 text-white rounded-2xl text-[10px] font-black shadow-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex items-center gap-2">
+                {isClientExporting ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
+                {isClientExporting ? "PROCESSING..." : "PDF INSTAN"}
               </button>
               <button onClick={handleDownloadPdfSSR} disabled={isDownloading} className="px-6 py-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black shadow-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex items-center gap-2">
                 <Cloud size={16} /> {isDownloading ? "ENGINE..." : "PDF ENGINE"}
@@ -194,7 +213,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
           style={{ backgroundColor: '#ffffff' }}
         >
           
-          {/* Header Identitas - Muncul hanya di Soal/Kunci, Sembunyikan di Kisi-kisi */}
           {exportMode !== 'kisi-kisi' ? (
             <div className="pdf-header-group mb-8">
               <div className="text-center mb-6">
