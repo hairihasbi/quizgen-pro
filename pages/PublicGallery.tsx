@@ -37,6 +37,16 @@ const PublicGallery: React.FC = () => {
     fetchPublicData();
   }, []);
 
+  // Efek untuk me-render matematika di galeri
+  useEffect(() => {
+    if (!loading && allQuizzes.length > 0) {
+      const timer = setTimeout(() => {
+        if ((window as any).renderAllMath) (window as any).renderAllMath('gallery-cards-area');
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, allQuizzes, currentPage, searchTerm, selectedSubject]);
+
   const filteredQuizzes = useMemo(() => {
     return allQuizzes.filter(q => {
       const matchSearch = q.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -90,7 +100,7 @@ const PublicGallery: React.FC = () => {
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-6 mt-20">
+      <main id="gallery-cards-area" className="max-w-7xl mx-auto px-6 mt-20">
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
             {[0, 1, 2, 3, 4, 5].map(i => <QuizCardSkeleton key={i} index={i} />)}
@@ -104,7 +114,7 @@ const PublicGallery: React.FC = () => {
                     <span className="px-5 py-2 bg-orange-50 text-orange-600 rounded-2xl text-[9px] font-black uppercase tracking-widest border border-orange-100">{quiz.subject}</span>
                     <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase ${quiz.difficulty === 'Sulit' ? 'bg-rose-50 text-rose-500' : 'bg-emerald-50 text-emerald-500'}`}>{quiz.difficulty}</span>
                   </div>
-                  <h3 className="text-2xl font-black text-gray-800 mb-4 group-hover:text-orange-500 transition-colors line-clamp-2 leading-tight">{quiz.title}</h3>
+                  <h3 className="text-2xl font-black text-gray-800 mb-4 group-hover:text-orange-500 transition-colors line-clamp-2 leading-tight" dangerouslySetInnerHTML={{ __html: quiz.title }}></h3>
                   <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-8">{quiz.level} • {quiz.grade} • {quiz.questions?.length || 0} Soal</div>
                   <div className="flex items-center justify-between pt-8 border-t border-gray-50 mt-auto">
                     <div className="flex items-center gap-4">

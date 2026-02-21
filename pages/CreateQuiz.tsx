@@ -47,18 +47,10 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
   useEffect(() => {
     if (workbenchData) {
       const timer = setTimeout(() => {
-        if ((window as any).renderMathInElement) {
-          (window as any).renderMathInElement(document.getElementById('preview-workbench-area'), {
-            delimiters: [
-              {left: '$$', right: '$$', display: true},
-              {left: '$', right: '$', display: false},
-              {left: '\\(', right: '\\)', display: false},
-              {left: '\\[', right: '\\]', display: true}
-            ],
-            throwOnError: false
-          });
+        if ((window as any).renderAllMath) {
+          (window as any).renderAllMath('preview-workbench-area');
         }
-      }, 300);
+      }, 500);
       return () => clearTimeout(timer);
     }
   }, [workbenchData]);

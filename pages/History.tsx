@@ -16,6 +16,16 @@ const History: React.FC<HistoryProps> = ({ user }) => {
     fetchQuizzes();
   }, [user.id]);
 
+  // Efek untuk me-render matematika di tabel riwayat
+  useEffect(() => {
+    if (quizzes.length > 0) {
+      const timer = setTimeout(() => {
+        if ((window as any).renderAllMath) (window as any).renderAllMath('history-table-area');
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [quizzes]);
+
   const fetchQuizzes = async () => {
     const data = await StorageService.getQuizzes(user);
     setQuizzes(data);
@@ -30,7 +40,7 @@ const History: React.FC<HistoryProps> = ({ user }) => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-      <div className="bg-white rounded-[2.5rem] border shadow-sm overflow-hidden">
+      <div id="history-table-area" className="bg-white rounded-[2.5rem] border shadow-sm overflow-hidden">
         <div className="p-8 border-b flex justify-between items-center bg-gray-50/30">
           <h3 className="text-xl font-black text-gray-800">Arsip & Riwayat Quiz</h3>
           <div className="flex gap-2">
@@ -64,7 +74,7 @@ const History: React.FC<HistoryProps> = ({ user }) => {
                     ></span>
                   </td>
                   <td className="px-8 py-6">
-                    <div className="font-bold text-gray-800 group-hover:text-orange-500 transition-colors">{quiz.title}</div>
+                    <div className="font-bold text-gray-800 group-hover:text-orange-500 transition-colors" dangerouslySetInnerHTML={{ __html: quiz.title }}></div>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-[10px] text-gray-400 font-bold uppercase">
                         📅 {new Date(quiz.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
