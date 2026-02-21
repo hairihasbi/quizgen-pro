@@ -27,7 +27,11 @@
                 ignoreHtmlClass: 'tex2jax_ignore' 
             },
             startup: { 
-                typeset: true
+                typeset: true,
+                ready: () => {
+                    MathJax.startup.defaultReady();
+                    console.log("MathJax is ready");
+                }
             }
         };
     </script>
@@ -42,6 +46,7 @@
             vertical-align: middle !important; 
             margin: 0 0.1em !important; 
             line-height: 0 !important;
+            min-width: 0.5em;
         }
 
         .print-container {
