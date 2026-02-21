@@ -39,33 +39,22 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
   }, [sortedQuestions]);
 
   const triggerKaTeX = async () => {
-    const element = document.getElementById('quiz-print-area');
-    if (element && (window as any).renderMathInElement) {
+    if ((window as any).renderAllMath) {
       setIsRenderingMath(true);
-      try {
-        (window as any).renderMathInElement(element, {
-          delimiters: [
-            {left: '$$', right: '$$', display: true},
-            {left: '$', right: '$', display: false},
-            {left: '\\(', right: '\\)', display: false},
-            {left: '\\[', right: '\\]', display: true}
-          ],
-          throwOnError: false
-        });
-      } catch (err) {
-        console.warn("KaTeX Render Failed:", err);
-      } finally {
-        // Beri jeda sangat singkat untuk painting ke browser
-        await new Promise(r => setTimeout(r, 100));
-        setIsRenderingMath(false);
-      }
+      // Panggil global helper yang sudah kita buat di index.html
+      (window as any).renderAllMath('quiz-print-area');
+      
+      // Jeda sangat singkat untuk memastikan painting selesai
+      await new Promise(r => setTimeout(r, 100));
+      setIsRenderingMath(false);
     }
   };
 
   useEffect(() => {
+    // Jalankan render setiap kali quiz atau mode berubah
     const timer = setTimeout(() => {
       triggerKaTeX();
-    }, 200);
+    }, 300);
     return () => clearTimeout(timer);
   }, [quiz, showAnswer, exportMode]);
 
@@ -91,9 +80,9 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
     if (container) container.scrollTop = 0;
 
     try {
-      // KaTeX sangat cepat, cukup render sekali dan tunggu 800ms untuk keamanan mutlak
+      // PROSES KRITIKAL: Pastikan KaTeX me-render segalanya sekali lagi sebelum snapshot
       await triggerKaTeX();
-      await new Promise(r => setTimeout(r, 800));
+      await new Promise(r => setTimeout(r, 1000)); // Tunggu 1 detik untuk kestabilan DOM
       
       const isLandscape = exportMode === 'kisi-kisi';
       const opt = {
