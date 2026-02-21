@@ -22,24 +22,27 @@ export class GeminiService {
   }
 
   private static getSystemInstruction(params: any): string {
-    const { subject, literacyMode, questionsPerPassage, optionCount } = params;
+    const { subject, literacyMode, questionsPerPassage, optionCount, cognitiveLevels } = params;
     const isEksakta = /matematika|fisika|kimia|ipa|sains/i.test(subject);
     
     let instruction = `Anda adalah AI Pakar Kurikulum Merdeka Indonesia. Output WAJIB JSON VALID.
     
-    STRUKTUR LITERASI (Wajib Patuh):
+    ATURAN LEVEL KOGNITIF:
+    - Distribusikan soal sesuai level yang dipilih user: ${cognitiveLevels.join(', ')}.
+    - Berikan indikator pencapaian kompetensi yang spesifik untuk tiap butir.
+
+    STRUKTUR LITERASI:
     - Mode: ${literacyMode}.
-    ${literacyMode === 'Tanpa Wacana' ? '- Field "passage" HARUS bernilai NULL/KOSONG untuk SEMUA soal.' : ''}
-    ${literacyMode === 'Wacana Per Soal' ? '- Setiap butir soal WAJIB memiliki teks unik di field "passage".' : ''}
+    ${literacyMode === 'Tanpa Wacana' ? '- Field "passage" HARUS bernilai NULL untuk SEMUA soal.' : ''}
+    ${literacyMode === 'Wacana Per Soal' ? '- Setiap butir soal WAJIB memiliki teks wacana unik.' : ''}
     ${literacyMode === 'Wacana Per Grup' ? `- Gunakan wacana yang SAMA untuk setiap blok berisi ${questionsPerPassage} soal.` : ''}
 
-    STRUKTUR JAWABAN:
+    ATURAN JAWABAN:
     - Pilihan Ganda: Harus memiliki ${optionCount} opsi. Jawaban: String ("A").
     - Pilihan Ganda Kompleks: Harus memiliki ${optionCount} opsi. Jawaban: ARRAY (Contoh: ["A", "C"]). Berikan minimal 2 jawaban benar.
-    - Benar/Salah: Opsi A: Benar, Opsi B: Salah. Jawaban: String ("A").
     
     MATEMATIKA:
-    ${isEksakta ? '- Gunakan LaTeX: $...$ untuk inline, $$...$$ untuk block. Contoh: $\\int_{0}^{5} x dx$.' : ''}
+    ${isEksakta ? '- Gunakan LaTeX: $...$ untuk inline, $$...$$ untuk block.' : ''}
     
     SCHEMA JSON:
     {
@@ -47,16 +50,16 @@ export class GeminiService {
         {
           "text": "Pertanyaan",
           "passage": "Teks wacana atau null",
-          "options": [{"label":"A", "text":"Teks Opsi"}],
-          "answer": "String (untuk PG) atau Array (untuk Kompleks)",
+          "options": [{"label":"A", "text":"Teks"}],
+          "answer": "String atau Array",
           "explanation": "Pembahasan",
-          "type": "Harus sesuai jenis soal",
-          "indicator": "Indikator soal",
-          "cognitiveLevel": "C1-C6"
+          "type": "Jenis soal",
+          "indicator": "Tujuan/indikator soal",
+          "cognitiveLevel": "Tingkatan Bloom"
         }
       ],
-      "tags": ["materi1"],
-      "grid": "Kisi-kisi singkat"
+      "tags": ["tag"],
+      "grid": "Matriks kisi-kisi"
     }`;
     return instruction;
   }
@@ -67,8 +70,8 @@ export class GeminiService {
     const prompt = `TUGAS: BUATKAN ${params.count} SOAL ${params.subject} TENTANG ${params.topic}.
     JENJANG: ${params.level} ${params.grade}.
     TIPE SOAL: ${params.questionTypes.join(', ')}.
-    JUMLAH OPSI: ${params.optionCount}.
-    KESULITAN: ${params.difficulty}.`;
+    TINGKAT KESULITAN: ${params.difficulty}.
+    VARIAN LEVEL: ${params.cognitiveLevels.join(', ')}.`;
 
     try {
       const response = await ai.models.generateContent({
@@ -90,7 +93,7 @@ export class GeminiService {
     try {
       const res = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
-        contents: { parts: [{ text: `High quality educational stimulus, white background: ${prompt}` }] }
+        contents: { parts: [{ text: `Professional educational vector illustration, white background, high contrast: ${prompt}` }] }
       });
       
       const candidate = res.candidates?.[0];
