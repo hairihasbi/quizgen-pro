@@ -6,7 +6,7 @@ import { SUBJECT_DATA, LEVEL_CONFIG, COGNITIVE_LEVELS } from '../constants';
 import { QuestionType, Quiz, Question, LogCategory, AIProgressEvent, UserRole } from '../types';
 import HumanError from '../components/HumanError';
 import { realtimeService } from '../services/realtimeService';
-import { CheckCircle2, ChevronLeft, Sparkles, BrainCircuit, BookOpen, Layers, Target, FileText } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, Sparkles, BrainCircuit, BookOpen, Layers, Target, FileText, Loader2 } from 'lucide-react';
 
 interface CreateQuizProps {
   user: any;
@@ -46,11 +46,12 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
   // MathJax Re-render untuk Preview
   useEffect(() => {
     if (workbenchData) {
+      // Jeda singkat agar DOM React selesai di-render
       const timer = setTimeout(() => {
         if ((window as any).MathJax?.typesetPromise) {
           (window as any).MathJax.typesetPromise().catch(() => {});
         }
-      }, 500);
+      }, 800);
       return () => clearTimeout(timer);
     }
   }, [workbenchData]);
@@ -310,7 +311,7 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
                   </div>
 
                   <button onClick={startGeneration} disabled={isGenerating} className="w-full py-8 orange-gradient text-white font-black rounded-[2.5rem] text-xl shadow-2xl hover:scale-[1.02] active:scale-95 transition-all uppercase flex items-center justify-center gap-4 group disabled:opacity-50">
-                    {isGenerating ? <div className="w-8 h-8 border-4 border-white/20 border-t-white rounded-full animate-spin"></div> : <Sparkles className="group-hover:rotate-12 transition-transform" />}
+                    {isGenerating ? <Loader2 className="w-8 h-8 animate-spin" /> : <Sparkles className="group-hover:rotate-12 transition-transform" />}
                     {isGenerating ? "SYNTESIZING..." : "GENERATE NASKAH SOAL ➜"}
                   </button>
                 </div>
