@@ -39,7 +39,7 @@ export interface Question {
   options?: { label: string; text: string; image?: string }[];
   answer: string | string[];
   explanation: string;
-  citation?: string; // Grounding field (Anti-Halusinasi)
+  citation?: string; 
   indicator: string;
   competency: string;
   topic: string;
@@ -64,6 +64,13 @@ export interface Quiz {
   isPublished: boolean;
   createdAt: string;
   status: 'completed' | 'failed' | 'processing';
+}
+
+export interface AISettings {
+  provider: 'native' | 'external';
+  baseUrl: string;
+  customApiKey: string;
+  targetModel: string;
 }
 
 export interface AIProgressEvent {
