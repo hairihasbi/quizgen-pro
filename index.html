@@ -11,27 +11,19 @@
     <!-- Library untuk Save PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-    <!-- KaTeX Core & CSS -->
+    <!-- KaTeX Stable Stack -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
-    
-    <!-- KaTeX Auto-render Extension (Wajib ada untuk delimit $...$) -->
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
 
     <script>
-        // Fungsi Super Renderer untuk menangani asinkronitas React
-        window.executeMath = function(containerId, retryCount = 0) {
-            const target = containerId ? document.getElementById(containerId) : document.body;
-            
-            if (!target) {
-                if (retryCount < 5) {
-                    setTimeout(() => window.executeMath(containerId, retryCount + 1), 200);
-                }
-                return;
-            }
+        // Fungsi Render Utama yang tangguh terhadap asinkronitas React
+        window.executeMath = function(containerId) {
+            const render = () => {
+                const target = containerId ? document.getElementById(containerId) : document.body;
+                if (!target) return;
 
-            if (typeof renderMathInElement === 'function') {
-                try {
+                if (typeof renderMathInElement === 'function') {
                     renderMathInElement(target, {
                         delimiters: [
                             {left: '$$', right: '$$', display: true},
@@ -40,17 +32,17 @@
                             {left: '\\[', right: '\\]', display: true}
                         ],
                         throwOnError: false,
-                        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"],
-                        ignoredClasses: ["tex2jax_ignore"]
+                        trust: true,
+                        strict: false
                     });
-                    console.log("KaTeX: Rendered successfully on " + (containerId || 'body'));
-                } catch (e) {
-                    console.error("KaTeX Error:", e);
+                    console.log("[KaTeX] Render Success on:", containerId || "Global");
                 }
-            } else {
-                console.warn("KaTeX: renderMathInElement not ready, retrying...");
-                setTimeout(() => window.executeMath(containerId, retryCount + 1), 300);
-            }
+            };
+
+            // Eksekusi ganda untuk menjamin render setelah DOM stabil
+            render();
+            setTimeout(render, 300);
+            setTimeout(render, 1000); 
         };
     </script>
 
@@ -58,9 +50,10 @@
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #fffaf0; margin: 0; padding: 0; }
         .orange-gradient { background: linear-gradient(135deg, #ff8c00 0%, #ff4500 100%); }
         
-        /* KaTeX Spacing & Appearance */
-        .katex { font-size: 1.1em !important; }
-        .katex-display { margin: 1em 0 !important; overflow-x: auto; overflow-y: hidden; }
+        /* KaTeX Visual Fixes */
+        .katex { font-size: 1.1em !important; line-height: 1.2; text-rendering: auto !important; }
+        .katex-display { margin: 1em 0 !important; overflow-x: auto; overflow-y: hidden; padding: 0.5em 0; }
+        .katex-html { white-space: normal !important; }
 
         .print-container {
             width: 210mm;
