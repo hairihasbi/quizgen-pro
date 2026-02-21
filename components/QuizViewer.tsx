@@ -38,27 +38,24 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
     return groups;
   }, [sortedQuestions]);
 
-  const triggerMath = () => {
+  const triggerMath = async () => {
     if ((window as any).executeMath) {
       setIsRenderingMath(true);
       // Panggil renderer ke ID spesifik
       (window as any).executeMath('quiz-print-area');
-      // Matikan loading setelah 500ms (asumsi render selesai)
-      setTimeout(() => setIsRenderingMath(false), 500);
+      // Matikan loading visual setelah render pertama
+      setTimeout(() => setIsRenderingMath(false), 800);
     }
   };
 
   useEffect(() => {
-    // Jeda 400ms memastikan Modal React sudah terbuka sempurna & DOM tersedia
-    const timer = setTimeout(() => {
-      triggerMath();
-    }, 400);
-    return () => clearTimeout(timer);
+    // Jalankan render setiap kali mode tampilan berubah
+    triggerMath();
   }, [quiz, showAnswer, exportMode]);
 
   const handlePrintDirect = async () => {
-    triggerMath();
-    await new Promise(r => setTimeout(r, 600)); // Tunggu render visual
+    (window as any).executeMath('quiz-print-area');
+    await new Promise(r => setTimeout(r, 800)); 
     const isLandscape = exportMode === 'kisi-kisi';
     const style = document.createElement('style');
     style.innerHTML = `@page { size: A4 ${isLandscape ? 'landscape' : 'portrait'}; margin: 15mm; }`;
@@ -76,9 +73,9 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
 
     setIsClientExporting(true);
     try {
-      // PAKSA RENDER SEKALI LAGI SEBELUM SNAPSHOT
-      triggerMath();
-      await new Promise(r => setTimeout(r, 1200)); 
+      // PAKSA RENDER SEKALI LAGI SEBELUM SNAPSHOT UNTUK STABILITAS PDF
+      (window as any).executeMath('quiz-print-area');
+      await new Promise(r => setTimeout(r, 1500)); 
       
       const isLandscape = exportMode === 'kisi-kisi';
       const opt = {
