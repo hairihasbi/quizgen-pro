@@ -103,10 +103,6 @@ const SiteSettings: React.FC = () => {
                       <input type="checkbox" className="w-5 h-5 accent-orange-500" checked={settings.aiFactChecker} onChange={e => setSettings({...settings, aiFactChecker: e.target.checked})} />
                       <span className="text-[10px] font-black text-gray-600 group-hover:text-orange-500 uppercase">Aktifkan AI Fact Checker</span>
                    </label>
-                   <label className="flex items-center gap-3 cursor-pointer group">
-                      <input type="checkbox" className="w-5 h-5 accent-orange-500" checked={settings.autoRotation} onChange={e => setSettings({...settings, autoRotation: e.target.checked})} />
-                      <span className="text-[10px] font-black text-gray-600 group-hover:text-orange-500 uppercase">Auto-Rotation Internal API</span>
-                   </label>
                 </div>
               </div>
             </div>
@@ -173,7 +169,7 @@ const SiteSettings: React.FC = () => {
                           <input 
                             type="text" 
                             className="w-full px-4 py-3 rounded-xl border bg-white text-[11px] font-mono outline-none focus:border-blue-500" 
-                            placeholder="dall-e-3"
+                            placeholder="gemini-2.5-flash-image"
                             value={aiSettings.targetImageModel || ''}
                             onChange={e => setAiSettings({...aiSettings, targetImageModel: e.target.value})}
                           />
@@ -184,8 +180,8 @@ const SiteSettings: React.FC = () => {
 
                  <p className="text-[9px] text-gray-400 font-bold uppercase leading-relaxed text-center px-4">
                    {aiSettings.provider === 'native' 
-                     ? "Sistem menggunakan Library SDK Google GenAI dengan API Key yang ada di pool." 
-                     : "Sistem akan melewati SDK dan memanggil REST API pihak ketiga (LiteLLM/OpenRouter)."}
+                     ? "Sistem adaptif: Menggunakan Flash Image secara prioritas, otomatis beralih ke Pro Image jika terjadi kegagalan." 
+                     : "Sistem akan menggunakan Model ID yang Anda tentukan melalui endpoint eksternal."}
                  </p>
               </div>
             </div>
@@ -216,8 +212,8 @@ const SiteSettings: React.FC = () => {
         <div className="bg-orange-50 p-8 rounded-[2rem] border border-orange-100 flex items-center gap-6">
            <div className="text-4xl">🛡️</div>
            <div>
-              <h4 className="font-black text-orange-800 uppercase text-xs">Arsitektur Engine Keamanan</h4>
-              <p className="text-[10px] text-orange-600 font-medium uppercase tracking-widest mt-1">Sistem akan secara otomatis mengenkripsi kunci API eksternal saat disimpan di database cloud Turso.</p>
+              <h4 className="font-black text-orange-800 uppercase text-xs">Hybrid Visual Engine</h4>
+              <p className="text-[10px] text-orange-600 font-medium uppercase tracking-widest mt-1">Struktur ini mengoptimalkan token & kuota dengan mencoba model teringan sebelum menggunakan model Pro.</p>
            </div>
         </div>
       </div>
