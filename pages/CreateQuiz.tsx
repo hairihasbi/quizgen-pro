@@ -43,6 +43,18 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
   const [referenceText, setReferenceText] = useState('');
   const [workbenchData, setWorkbenchData] = useState<{questions: Question[], grid: string, tags: string[]} | null>(null);
 
+  // MathJax Re-render untuk Preview
+  useEffect(() => {
+    if (workbenchData) {
+      const timer = setTimeout(() => {
+        if ((window as any).MathJax?.typesetPromise) {
+          (window as any).MathJax.typesetPromise().catch(() => {});
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [workbenchData]);
+
   // Update Mapel Saat Jenjang Berubah
   useEffect(() => {
     const categories = Object.keys(SUBJECT_DATA[formData.level] || {});
@@ -148,7 +160,7 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
   if (workbenchData) {
     return (
       <div className="max-w-5xl mx-auto space-y-8 animate-in zoom-in-95 duration-500 pb-20">
-        <div className="bg-white p-10 rounded-[3rem] shadow-2xl border border-orange-100">
+        <div id="preview-workbench-area" className="bg-white p-10 rounded-[3rem] shadow-2xl border border-orange-100">
            <div className="flex flex-col md:flex-row justify-between items-center mb-10 border-b pb-8 gap-6">
               <div className="flex items-center gap-5">
                  <div className="w-16 h-16 orange-gradient rounded-3xl flex items-center justify-center text-white text-3xl shadow-xl">✅</div>
@@ -270,7 +282,7 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       {COGNITIVE_LEVELS.map(lvl => (
-                        <button key={lvl} onClick={() => toggleArrayItem('cognitiveLevels', lvl)} className={`px-4 py-3 rounded-xl text-[10px] font-black uppercase transition-all border-2 ${formData.cognitiveLevels.includes(lvl) ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg' : 'bg-gray-50 text-gray-400 border-transparent hover:bg-emerald-50'}`}>
+                        <button key={lvl} onClick={() => toggleArrayItem('cognitiveLevels', lvl)} className={`px-4 py-3 rounded-xl text-[10px] font-black uppercase transition-all border-2 ${formData.cognitiveLevels.includes(lvl) ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg' : 'bg-gray-50 text-gray-400 border-transparent hover:bg-orange-50'}`}>
                           {lvl}
                         </button>
                       ))}
