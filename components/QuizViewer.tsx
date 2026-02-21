@@ -38,45 +38,45 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
     return groups;
   }, [sortedQuestions]);
 
-  const triggerMathJax = async () => {
-    if ((window as any).MathJax?.typesetPromise) {
+  const triggerKaTeX = async () => {
+    const element = document.getElementById('quiz-print-area');
+    if (element && (window as any).renderMathInElement) {
+      setIsRenderingMath(true);
       try {
-        // Render spesifik pada area print agar lebih efisien
-        const el = document.getElementById('quiz-print-area');
-        if (el) {
-          await (window as any).MathJax.typesetPromise([el]);
-        } else {
-          await (window as any).MathJax.typesetPromise();
-        }
+        (window as any).renderMathInElement(element, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });
       } catch (err) {
-        console.warn("MathJax Typeset Failed:", err);
+        console.warn("KaTeX Render Failed:", err);
+      } finally {
+        // Beri jeda sangat singkat untuk painting ke browser
+        await new Promise(r => setTimeout(r, 100));
+        setIsRenderingMath(false);
       }
     }
   };
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      triggerMathJax();
-    }, 500);
+      triggerKaTeX();
+    }, 200);
     return () => clearTimeout(timer);
   }, [quiz, showAnswer, exportMode]);
 
   const handlePrintDirect = async () => {
-    setIsRenderingMath(true);
-    await triggerMathJax();
-    await new Promise(r => setTimeout(r, 1000));
-    
+    await triggerKaTeX();
     const isLandscape = exportMode === 'kisi-kisi';
     const style = document.createElement('style');
     style.innerHTML = `@page { size: A4 ${isLandscape ? 'landscape' : 'portrait'}; margin: 15mm; }`;
     document.head.appendChild(style);
-    
     window.print();
-    setIsRenderingMath(false);
-    
-    setTimeout(() => {
-      if (style.parentNode) document.head.removeChild(style);
-    }, 1000);
+    setTimeout(() => { if (style.parentNode) document.head.removeChild(style); }, 1000);
   };
 
   const handleExportPdfClient = async () => {
@@ -87,20 +87,13 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
     }
 
     setIsClientExporting(true);
-    setIsRenderingMath(true);
-    
     const container = document.querySelector('.print-scroll-container');
     if (container) container.scrollTop = 0;
 
     try {
-      // PROSES PENTING: Paksa render ulang MathJax sebelum snapshot
-      // Kita lakukan 2x untuk memastikan nesting formula ter-render sempurna
-      await triggerMathJax();
-      await new Promise(r => setTimeout(r, 1000));
-      await triggerMathJax();
-      
-      // Jeda ekstra agar browser menyelesaikan painting SVG ke DOM
-      await new Promise(r => setTimeout(r, 2500));
+      // KaTeX sangat cepat, cukup render sekali dan tunggu 800ms untuk keamanan mutlak
+      await triggerKaTeX();
+      await new Promise(r => setTimeout(r, 800));
       
       const isLandscape = exportMode === 'kisi-kisi';
       const opt = {
@@ -123,7 +116,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
       alert("Gagal export PDF: " + err.message);
     } finally {
       setIsClientExporting(false);
-      setIsRenderingMath(false);
     }
   };
 
@@ -163,12 +155,12 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
       <header className="flex flex-col lg:flex-row justify-between items-center bg-white p-6 rounded-[2.5rem] shadow-2xl mb-8 border border-gray-100 gap-6 no-print">
         <div className="flex items-center gap-5">
           <div className="w-14 h-14 orange-gradient rounded-2xl flex items-center justify-center text-white text-3xl shadow-lg">
-             {isRenderingMath ? <Loader2 className="animate-spin" size={24} /> : "📄"}
+             {isClientExporting || isRenderingMath ? <Loader2 className="animate-spin" size={24} /> : "📄"}
           </div>
           <div>
             <h2 className="font-black text-gray-800 uppercase text-xs tracking-tight truncate max-w-[280px]">{quiz.title}</h2>
             <div className="text-[9px] font-black text-orange-500 uppercase mt-1 tracking-widest">
-               {isRenderingMath ? "RENDERING FORMULA..." : `${exportMode.toUpperCase()} VIEW`}
+               {isClientExporting ? "PREPARING PDF..." : isRenderingMath ? "RENDERING MATH..." : `${exportMode.toUpperCase()} VIEW`}
             </div>
           </div>
         </div>
@@ -190,10 +182,10 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
 
           {!hideDownload && (
             <>
-              <button onClick={handlePrintDirect} disabled={isRenderingMath} className="px-6 py-4 bg-emerald-500 text-white rounded-2xl text-[10px] font-black shadow-lg transition-all hover:scale-105 active:scale-95 flex items-center gap-2 disabled:opacity-50">
+              <button onClick={handlePrintDirect} className="px-6 py-4 bg-emerald-500 text-white rounded-2xl text-[10px] font-black shadow-lg transition-all hover:scale-105 active:scale-95 flex items-center gap-2">
                 <Printer size={16} /> CETAK
               </button>
-              <button onClick={handleExportPdfClient} disabled={isClientExporting || isRenderingMath} className="px-6 py-4 bg-orange-600 text-white rounded-2xl text-[10px] font-black shadow-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex items-center gap-2">
+              <button onClick={handleExportPdfClient} disabled={isClientExporting} className="px-6 py-4 bg-orange-600 text-white rounded-2xl text-[10px] font-black shadow-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex items-center gap-2">
                 {isClientExporting ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
                 {isClientExporting ? "PROCESSING..." : "PDF INSTAN"}
               </button>
