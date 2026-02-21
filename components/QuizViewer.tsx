@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { Quiz, QuestionType, Question } from '../types';
-import { Printer, Download, Cloud, X, Layout, FileText, CheckCircle2, TableProperties } from 'lucide-react';
+import { Printer, Download, Cloud, X, FileText, CheckCircle2, TableProperties } from 'lucide-react';
 
 interface QuizViewerProps {
   quiz: Quiz;
@@ -54,16 +54,16 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
   }, [quiz, showAnswer, exportMode]);
 
   const handlePrintDirect = () => {
-    // Tambahkan class orientasi ke body sementara untuk printing
     const isLandscape = exportMode === 'kisi-kisi';
     const style = document.createElement('style');
-    style.innerHTML = `@page { size: A4 ${isLandscape ? 'landscape' : 'portrait'}; }`;
+    style.innerHTML = `@page { size: A4 ${isLandscape ? 'landscape' : 'portrait'}; margin: 15mm; }`;
     document.head.appendChild(style);
     
     window.print();
     
-    // Bersihkan style setelah print dialog tertutup
-    setTimeout(() => document.head.removeChild(style), 500);
+    setTimeout(() => {
+      if (style.parentNode) document.head.removeChild(style);
+    }, 1000);
   };
 
   const handleExportPdfClient = async () => {
@@ -74,12 +74,11 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
     }
 
     setIsClientExporting(true);
-    
     const container = document.querySelector('.print-scroll-container');
     if (container) container.scrollTop = 0;
 
-    // Beri waktu render gambar & mathjax
-    await new Promise(r => setTimeout(r, 1200));
+    // Tunggu render visual (gambar + rumus)
+    await new Promise(r => setTimeout(r, 1500));
     
     const isLandscape = exportMode === 'kisi-kisi';
     
@@ -91,7 +90,8 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
         scale: 2, 
         useCORS: true,
         letterRendering: true,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        logging: false
       },
       jsPDF: { unit: 'mm', format: 'a4', orientation: isLandscape ? 'landscape' : 'portrait' },
       pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
@@ -144,7 +144,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
           <div className="w-14 h-14 orange-gradient rounded-2xl flex items-center justify-center text-white text-3xl shadow-lg">📄</div>
           <div>
             <h2 className="font-black text-gray-800 uppercase text-xs tracking-tight truncate max-w-[280px]">{quiz.title}</h2>
-            <div className="text-[9px] font-black text-orange-500 uppercase mt-1 tracking-widest">{exportMode.replace('-', ' ')} Mode</div>
+            <div className="text-[9px] font-black text-orange-500 uppercase mt-1 tracking-widest">{exportMode.toUpperCase()} VIEW</div>
           </div>
         </div>
         
@@ -187,29 +187,29 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
           style={{ backgroundColor: '#ffffff' }}
         >
           
-          {/* Header Identitas - Disembunyikan di Kisi-kisi */}
+          {/* Header Identitas - Muncul hanya di Soal/Kunci, Sembunyikan di Kisi-kisi */}
           {exportMode !== 'kisi-kisi' ? (
             <div className="pdf-header-group mb-8">
               <div className="text-center mb-6">
                 <h1 className="text-xl font-black m-0 uppercase tracking-tighter">NASKAH SOAL EVALUASI HASIL BELAJAR</h1>
                 <h2 className="text-lg font-bold m-0 uppercase">{(quiz.subject || '').toUpperCase()} - {(quiz.grade || '').toUpperCase()}</h2>
-                <div className="border-t-4 border-b border-black h-2 mt-4"></div>
+                <div className="border-t-[3px] border-b border-black h-1.5 mt-4"></div>
               </div>
               
               <div className="mb-8">
-                <table className="w-full border-collapse text-[10pt]">
+                <table className="w-full border-collapse border-none text-[10pt]">
                   <tbody>
-                    <tr>
-                      <td className="w-28 py-1 font-bold">Nama Siswa</td><td className="w-4 py-1 text-center">:</td>
-                      <td className="py-1 border-b border-gray-300 italic text-gray-300">...........................................................</td>
-                      <td className="w-28 py-1 font-bold text-right">Hari / Tanggal</td><td className="w-4 py-1 text-center">:</td>
-                      <td className="w-36 py-1 border-b border-gray-300 italic text-gray-300">.........................</td>
+                    <tr className="border-none">
+                      <td className="w-28 py-1 font-bold border-none">Nama Siswa</td><td className="w-4 py-1 text-center border-none">:</td>
+                      <td className="py-1 border-b border-gray-300 italic text-gray-300 border-none">...........................................................</td>
+                      <td className="w-28 py-1 font-bold text-right border-none">Hari / Tanggal</td><td className="w-4 py-1 text-center border-none">:</td>
+                      <td className="w-36 py-1 border-b border-gray-300 italic text-gray-300 border-none">.........................</td>
                     </tr>
-                    <tr>
-                      <td className="py-1 font-bold">Kelas / No. Absen</td><td className="py-1 text-center">:</td>
-                      <td className="py-1 border-b border-gray-300 italic text-gray-300">...........................................................</td>
-                      <td className="py-1 font-bold text-right">Waktu</td><td className="py-1 text-center">:</td>
-                      <td className="py-1 border-b border-gray-300 italic text-gray-300 text-center">90 Menit</td>
+                    <tr className="border-none">
+                      <td className="py-1 font-bold border-none">Kelas / No. Absen</td><td className="py-1 text-center border-none">:</td>
+                      <td className="py-1 border-b border-gray-300 italic text-gray-300 border-none">...........................................................</td>
+                      <td className="py-1 font-bold text-right border-none">Waktu</td><td className="py-1 text-center border-none">:</td>
+                      <td className="py-1 border-b border-gray-300 italic text-gray-300 text-center border-none">90 Menit</td>
                     </tr>
                   </tbody>
                 </table>
@@ -219,38 +219,38 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
             <div className="pdf-header-group text-center mb-10">
               <h1 className="text-2xl font-black m-0 uppercase tracking-tighter underline">MATRIKS KISI-KISI PENULISAN SOAL</h1>
               <h2 className="text-lg font-bold m-0 mt-2 uppercase">{(quiz.subject || '').toUpperCase()} - {(quiz.grade || '').toUpperCase()}</h2>
-              <p className="text-[10px] font-black text-gray-400 mt-2 uppercase tracking-widest italic">Kurikulum Merdeka • GenZ QuizGen Engine v3.1</p>
+              <div className="h-1 w-24 bg-black mx-auto mt-4"></div>
             </div>
           )}
 
           <div className="space-y-10">
             {exportMode === 'kisi-kisi' ? (
-              <table className="w-full border-collapse border-2 border-black text-[9pt]">
+              <table className="w-full border-collapse border-[1.5px] border-black text-[9pt]">
                 <thead>
                   <tr className="bg-gray-100">
-                    <th className="border-2 border-black p-3 w-10 text-center uppercase font-black">NO</th>
-                    <th className="border-2 border-black p-3 w-48 text-left uppercase font-black">CP / KD / KOMPETENSI DASAR</th>
-                    <th className="border-2 border-black p-3 w-40 text-left uppercase font-black">MATERI POKOK</th>
-                    <th className="border-2 border-black p-3 text-left uppercase font-black">INDIKATOR SOAL</th>
-                    <th className="border-2 border-black p-3 w-20 text-center uppercase font-black">LEVEL</th>
-                    <th className="border-2 border-black p-3 w-28 text-center uppercase font-black">BENTUK</th>
-                    <th className="border-2 border-black p-3 w-12 text-center uppercase font-black">NO</th>
-                    <th className="border-2 border-black p-3 w-16 text-center uppercase font-black">KUNCI</th>
+                    <th className="border-[1.5px] border-black p-3 w-10 text-center uppercase font-black">NO</th>
+                    <th className="border-[1.5px] border-black p-3 w-48 text-left uppercase font-black">CP / KD / KOMPETENSI DASAR</th>
+                    <th className="border-[1.5px] border-black p-3 w-40 text-left uppercase font-black">MATERI POKOK</th>
+                    <th className="border-[1.5px] border-black p-3 text-left uppercase font-black">INDIKATOR SOAL</th>
+                    <th className="border-[1.5px] border-black p-3 w-16 text-center uppercase font-black">LEVEL</th>
+                    <th className="border-[1.5px] border-black p-3 w-28 text-center uppercase font-black">BENTUK</th>
+                    <th className="border-[1.5px] border-black p-3 w-10 text-center uppercase font-black">NO</th>
+                    <th className="border-[1.5px] border-black p-3 w-14 text-center uppercase font-black">KUNCI</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sortedQuestions.map((q, i) => (
                     <tr key={q.id}>
-                      <td className="border-2 border-black p-3 text-center font-bold">{i + 1}</td>
-                      <td className="border-2 border-black p-3 align-top leading-relaxed text-justify">{q.competency || '-'}</td>
-                      <td className="border-2 border-black p-3 align-top font-bold uppercase">{q.topic || quiz.topic}</td>
-                      <td className="border-2 border-black p-3 align-top leading-relaxed text-justify">
+                      <td className="border-[1.5px] border-black p-3 text-center font-bold">{i + 1}</td>
+                      <td className="border-[1.5px] border-black p-3 align-top leading-relaxed text-justify">{q.competency || '-'}</td>
+                      <td className="border-[1.5px] border-black p-3 align-top font-bold uppercase">{q.topic || quiz.topic}</td>
+                      <td className="border-[1.5px] border-black p-3 align-top leading-relaxed text-justify">
                         <div dangerouslySetInnerHTML={{ __html: q.indicator }}></div>
                       </td>
-                      <td className="border-2 border-black p-3 text-center font-black">{q.cognitiveLevel.split(' ')[0]}</td>
-                      <td className="border-2 border-black p-3 text-center text-[8pt] font-bold uppercase">{q.type}</td>
-                      <td className="border-2 border-black p-3 text-center font-black">{i + 1}</td>
-                      <td className="border-2 border-black p-3 text-center font-black text-orange-600 uppercase">
+                      <td className="border-[1.5px] border-black p-3 text-center font-black">{q.cognitiveLevel.split(' ')[0]}</td>
+                      <td className="border-[1.5px] border-black p-3 text-center text-[8pt] font-bold uppercase">{q.type}</td>
+                      <td className="border-[1.5px] border-black p-3 text-center font-black">{i + 1}</td>
+                      <td className="border-[1.5px] border-black p-3 text-center font-black text-orange-600 uppercase">
                         {Array.isArray(q.answer) ? q.answer.join(',') : q.answer}
                       </td>
                     </tr>
@@ -260,18 +260,18 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
             ) : (
               Object.entries(groupedQuestions).map(([type, questions], gIdx) => (
                 <div key={type} className="space-y-6">
-                  <div className="bg-gray-100 px-6 py-2 border-y-2 border-black font-black text-[11pt] uppercase tracking-tighter">
+                  <div className="bg-gray-100 px-6 py-2 border-y-[1.5px] border-black font-black text-[11pt] uppercase tracking-tighter">
                     {String.fromCharCode(65 + gIdx)}. {type}
                   </div>
-                  <div className="space-y-8">
+                  <div className="space-y-10">
                     {questions.map((q, i) => {
                       globalIndex++; 
                       const isNewPassage = q.passage && (i === 0 || questions[i-1].passage !== q.passage);
                       return (
                         <div key={q.id} className="pdf-block">
                           {isNewPassage && (
-                            <div className="bg-gray-50 border-2 border-black p-6 mb-6 italic text-[10.5pt] text-justify leading-relaxed">
-                              <div className="font-black uppercase text-[8pt] mb-2 border-b border-black inline-block">Wacana Stimulus:</div>
+                            <div className="bg-gray-50 border-[1.5px] border-black p-6 mb-6 italic text-[10.5pt] text-justify leading-relaxed relative">
+                              <div className="absolute top-0 left-4 -translate-y-1/2 bg-white px-3 font-black text-[8pt] border border-black uppercase tracking-widest">Wacana Stimulus</div>
                               <div dangerouslySetInnerHTML={{ __html: q.passage! }}></div>
                             </div>
                           )}
@@ -283,12 +283,12 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
                               {/* GAMBAR STIMULUS */}
                               {q.image && (
                                 <div className="my-6">
-                                  <img src={q.image} className="max-w-full md:max-w-[420px] rounded-xl border-4 border-gray-50 shadow-md" alt="Visual Stimulus" />
+                                  <img src={q.image} className="max-w-full md:max-w-[420px] rounded-xl border-[3px] border-gray-100 shadow-md" alt="Visual Stimulus" />
                                 </div>
                               )}
 
                               {q.options && q.options.length > 0 && (
-                                <div className="grid grid-cols-2 gap-x-8 gap-y-2 mb-6">
+                                <div className="grid grid-cols-2 gap-x-8 gap-y-2 mb-6 ml-2">
                                   {q.options.map(opt => (
                                     <div key={opt.label} className="flex gap-3 items-start">
                                       <span className="font-black w-5 shrink-0">{opt.label}.</span>
@@ -299,7 +299,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
                               )}
 
                               {(exportMode === 'lengkap' || showAnswer) && (
-                                <div className="bg-emerald-50 border-2 border-dashed border-emerald-300 p-6 rounded-[2rem] text-[9.5pt] italic mt-4 shadow-sm">
+                                <div className="bg-emerald-50 border-[1.5px] border-dashed border-emerald-300 p-6 rounded-3xl text-[9.5pt] italic mt-4 shadow-sm">
                                   <div className="font-black text-emerald-700 uppercase text-[8pt] mb-1 flex items-center gap-2">
                                     <CheckCircle2 size={12} /> KUNCI JAWABAN: {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}
                                   </div>
@@ -319,8 +319,8 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
           </div>
           
           <div className="mt-12 pt-4 border-t border-gray-100 text-[8pt] text-gray-300 italic flex justify-between uppercase font-bold tracking-widest no-print">
-            <span>GenZ QuizGen Pro v3.1 Cloud Synchronized</span>
-            <span>Ref ID: {quiz.id.substring(0,12).toUpperCase()}</span>
+            <span>GenZ QuizGen Pro v3.1 AI Neural</span>
+            <span>ID: {quiz.id.substring(0,10).toUpperCase()}</span>
           </div>
         </div>
       </div>
