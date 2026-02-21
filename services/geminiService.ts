@@ -141,7 +141,7 @@ export class GeminiService {
     const prompt = `TUGAS: BUATKAN ${totalCount} SOAL UNTUK ${(params.subject || '').toUpperCase()} TENTANG ${params.topic}.
     JENJANG: ${params.level} ${params.grade}. KESULITAN: ${params.difficulty}.
     ${hasReference ? `REFERENSI: ${params.referenceText}` : ''}
-    ${retrievedContext && retrievedContext.length > 0 ? `HINDARI DUPLIKASI DENGAN SOAL INI: ${retrievedContext.map(q => q.text).join(' | ')}` : ''}`;
+    ${retrievedContext && retrievedContext.length > 0 ? `HINDARI DUPLIKASI TEMA DENGAN SOAL INI: ${retrievedContext.map(q => q.text).join(' | ')}` : ''}`;
 
     const externalCall = async (settings: any) => {
       const cleanUrl = settings.baseUrl.endsWith('/') ? settings.baseUrl.slice(0, -1) : settings.baseUrl;
@@ -262,8 +262,14 @@ export class GeminiService {
         contents: { parts: [{ text: `Simple educational illustration for: ${prompt}` }] },
         config: { imageConfig: { aspectRatio: "1:1" } }
       });
-      const part = flashRes.candidates[0].content.parts.find(p => p.inlineData);
-      if (part?.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
+      
+      if (flashRes.candidates && flashRes.candidates.length > 0) {
+        for (const part of flashRes.candidates[0].content.parts) {
+          if (part.inlineData) {
+            return `data:image/png;base64,${part.inlineData.data}`;
+          }
+        }
+      }
     } catch (e) {
       console.warn("[FLASH_IMAGE_FAILED] Attempting fallback to Pro Engine...");
     }
@@ -275,8 +281,14 @@ export class GeminiService {
         contents: { parts: [{ text: `High quality professional educational diagram or stimulus for: ${prompt}` }] },
         config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
       });
-      const part = proRes.candidates[0].content.parts.find(p => p.inlineData);
-      if (part?.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
+      
+      if (proRes.candidates && proRes.candidates.length > 0) {
+        for (const part of proRes.candidates[0].content.parts) {
+          if (part.inlineData) {
+            return `data:image/png;base64,${part.inlineData.data}`;
+          }
+        }
+      }
     } catch (e) {
       console.error("[PRO_IMAGE_FAILED] Visual generation completely failed.");
     }
