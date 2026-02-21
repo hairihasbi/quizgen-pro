@@ -43,15 +43,22 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
   const [referenceText, setReferenceText] = useState('');
   const [workbenchData, setWorkbenchData] = useState<{questions: Question[], grid: string, tags: string[]} | null>(null);
 
-  // MathJax Re-render untuk Preview
+  // KaTeX Re-render untuk Preview
   useEffect(() => {
     if (workbenchData) {
-      // Jeda singkat agar DOM React selesai di-render
       const timer = setTimeout(() => {
-        if ((window as any).MathJax?.typesetPromise) {
-          (window as any).MathJax.typesetPromise().catch(() => {});
+        if ((window as any).renderMathInElement) {
+          (window as any).renderMathInElement(document.getElementById('preview-workbench-area'), {
+            delimiters: [
+              {left: '$$', right: '$$', display: true},
+              {left: '$', right: '$', display: false},
+              {left: '\\(', right: '\\)', display: false},
+              {left: '\\[', right: '\\]', display: true}
+            ],
+            throwOnError: false
+          });
         }
-      }, 800);
+      }, 300);
       return () => clearTimeout(timer);
     }
   }, [workbenchData]);
