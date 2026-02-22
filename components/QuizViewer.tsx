@@ -209,6 +209,10 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
                     <div className="flex gap-4">
                        <div className="font-bold text-[11pt] w-7 shrink-0 text-right">{globalIndex}.</div>
                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                             <span className="text-[7pt] font-black bg-black text-white px-2 py-0.5 rounded uppercase tracking-widest">{q.type}</span>
+                             <span className="text-[7pt] font-bold text-gray-400 uppercase tracking-widest">{q.cognitiveLevel}</span>
+                          </div>
                           <div className="font-bold text-justify mb-5 text-[11pt] leading-relaxed" dangerouslySetInnerHTML={{ __html: q.text }}></div>
                           
                           {q.image && (
@@ -222,7 +226,19 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
                              </div>
                           )}
 
-                          {q.options && (
+                          {/* Render Options based on type */}
+                          {q.type === QuestionType.TRUE_FALSE ? (
+                            <div className="grid grid-cols-2 gap-x-12 gap-y-3 ml-1">
+                               <div className="flex gap-4 items-start">
+                                  <span className="w-5 h-5 flex items-center justify-center border border-black rounded-full text-[9pt] font-black shrink-0">A</span>
+                                  <span className="text-[10pt] font-medium leading-snug">Benar</span>
+                               </div>
+                               <div className="flex gap-4 items-start">
+                                  <span className="w-5 h-5 flex items-center justify-center border border-black rounded-full text-[9pt] font-black shrink-0">B</span>
+                                  <span className="text-[10pt] font-medium leading-snug">Salah</span>
+                               </div>
+                            </div>
+                          ) : (q.type !== QuestionType.SHORT_ANSWER && q.type !== QuestionType.ESSAY && q.options) ? (
                             <div className="grid grid-cols-2 gap-x-12 gap-y-3 ml-1">
                                {q.options.map(opt => (
                                  <div key={opt.label} className="flex gap-4 items-start">
@@ -233,7 +249,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
                                  </div>
                                ))}
                             </div>
-                          )}
+                          ) : null}
 
                           {(showAnswer || exportMode === 'lengkap') && (
                             <div className="mt-6 p-6 bg-emerald-50 border-[1.2px] border-dashed border-emerald-400 rounded-3xl text-[10pt] italic shadow-inner" style={{ pageBreakInside: 'avoid' }}>
