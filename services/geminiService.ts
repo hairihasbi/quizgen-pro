@@ -1,6 +1,7 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, QuestionType } from "../types";
+import { StorageService } from "./storageService";
 
 export class GeminiService {
   private static extractJson(text: string): any {
@@ -65,7 +66,24 @@ export class GeminiService {
   }
 
   async generateQuiz(params: any): Promise<any> {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const aiSettings = await StorageService.getAISettings();
+    const isExternal = aiSettings.provider === 'external';
+    
+    let apiKey = process.env.API_KEY;
+    let baseUrl = undefined;
+    let modelId = params.model || 'gemini-3-flash-preview';
+
+    if (isExternal) {
+      apiKey = aiSettings.customApiKey;
+      baseUrl = aiSettings.baseUrl;
+      modelId = aiSettings.targetModel || modelId;
+    }
+
+    const ai = new GoogleGenAI({ 
+      apiKey: apiKey,
+      server: baseUrl
+    } as any);
+
     const system = GeminiService.getSystemInstruction(params);
     const prompt = `TUGAS: BUATKAN ${params.count} SOAL ${params.subject} TENTANG ${params.topic}.
     JENJANG: ${params.level} ${params.grade}.
@@ -75,7 +93,7 @@ export class GeminiService {
 
     try {
       const response = await ai.models.generateContent({
-        model: params.model || 'gemini-3-pro-preview',
+        model: modelId,
         contents: prompt,
         config: {
           systemInstruction: system,
@@ -89,10 +107,27 @@ export class GeminiService {
   }
 
   async generateVisual(prompt: string): Promise<string> {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const aiSettings = await StorageService.getAISettings();
+    const isExternal = aiSettings.provider === 'external';
+    
+    let apiKey = process.env.API_KEY;
+    let baseUrl = undefined;
+    let modelId = 'gemini-3-pro-image-preview';
+
+    if (isExternal) {
+      apiKey = aiSettings.customApiKey;
+      baseUrl = aiSettings.baseUrl;
+      modelId = aiSettings.targetImageModel || modelId;
+    }
+
+    const ai = new GoogleGenAI({ 
+      apiKey: apiKey,
+      server: baseUrl
+    } as any);
+
     try {
       const res = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
+        model: modelId,
         contents: { parts: [{ text: `A clean, high-contrast educational illustration for classroom test. Black and white or simple colors. Minimalist style. Content: ${prompt}` }] }
       });
       
