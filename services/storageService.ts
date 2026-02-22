@@ -202,7 +202,7 @@ export const StorageService = {
   },
   addApiKeys: async (keys: string[]) => {
     const local = StorageService.localGet('api_keys');
-    const newEntries = keys.map(key => ({ id: crypto.randomUUID(), key, usageCount: 0, lastUsed: '-', isActive: true, errorCount: 0, lastErrorAt: '-' }));
+    const newEntries = keys.map(key => ({ id: window.crypto.randomUUID(), key, usageCount: 0, lastUsed: '-', isActive: true, errorCount: 0, lastErrorAt: '-' }));
     StorageService.localSet('api_keys', [...local, ...newEntries]);
     const client = StorageService.getClient();
     if (client && !_isLocal) { try { await client.batch(newEntries.map(entry => ({ sql: "INSERT INTO api_keys (id, key, usage_count, last_used, isActive, error_count, last_error_at) VALUES (?, ?, ?, ?, ?, ?, ?)", args: [entry.id, entry.key, 0, entry.lastUsed, 1, 0, entry.lastErrorAt] })), "write"); } catch (e) {} }

@@ -62,7 +62,7 @@ export const EmailService = {
   send: async (toEmail: string, type: 'success' | 'error' | 'warning' | 'info', subject: string, message: string, forceRealEmail: boolean = false) => {
     try {
       const newNotif: EmailNotification = {
-        id: crypto.randomUUID(),
+        id: window.crypto.randomUUID(),
         to: toEmail,
         subject,
         body: message,
