@@ -56,9 +56,9 @@
         .katex-display { margin: 1em 0 !important; overflow-x: auto; overflow-y: hidden; }
         
         .print-container {
-            width: 215mm;
-            min-height: 330mm;
-            padding: 15mm; 
+            width: 185mm; /* 215mm - 30mm margin */
+            min-height: 300mm;
+            padding: 0; 
             margin: 0 auto;
             background: white;
             box-sizing: border-box;
@@ -67,11 +67,31 @@
         }
 
         @media print {
-            @page { margin: 0; size: A4; }
+            @page { margin: 15mm; size: 215mm 330mm; }
             body { background: white !important; }
-            #root > *:not(.print-modal-wrapper) { display: none !important; }
             .no-print { display: none !important; }
-            .print-container { width: 100% !important; padding: 12mm !important; box-shadow: none !important; }
+            
+            /* Hide everything by default */
+            body > * { display: none !important; }
+            
+            /* Show only the portal-ed modal */
+            body > .print-modal-wrapper { 
+                display: flex !important; 
+                position: static !important;
+                width: 100% !important;
+                height: auto !important;
+                background: white !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow: visible !important;
+            }
+            
+            .print-modal-wrapper .print-container {
+                width: 100% !important;
+                box-shadow: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
         }
     </style>
 <script type="importmap">
