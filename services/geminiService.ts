@@ -69,21 +69,28 @@ export class GeminiService {
     const aiSettings = await StorageService.getAISettings();
     const isExternal = aiSettings.provider === 'external';
     
-    let apiKey = process.env.API_KEY;
+    // Gunakan GEMINI_API_KEY sebagai default sesuai standar platform
+    let apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
     let baseUrl = undefined;
     let modelId = params.model || 'gemini-3-flash-preview';
 
     if (isExternal) {
-      apiKey = aiSettings.customApiKey;
+      // Jika eksternal, prioritaskan key dari settings
+      apiKey = aiSettings.customApiKey || apiKey;
       baseUrl = aiSettings.baseUrl;
       modelId = aiSettings.targetModel || modelId;
     }
 
-    const ai = new GoogleGenAI({ 
-      apiKey: apiKey,
-      server: baseUrl
-    } as any);
+    if (!apiKey) {
+      throw new Error("API Key tidak ditemukan. Silakan konfigurasi di menu Pengaturan atau periksa environment variable.");
+    }
 
+    const options: any = { apiKey };
+    if (isExternal && baseUrl) {
+      options.baseUrl = baseUrl;
+    }
+
+    const ai = new GoogleGenAI(options);
     const system = GeminiService.getSystemInstruction(params);
     const prompt = `TUGAS: BUATKAN ${params.count} SOAL ${params.subject} TENTANG ${params.topic}.
     JENJANG: ${params.level} ${params.grade}.
@@ -100,9 +107,20 @@ export class GeminiService {
           responseMimeType: "application/json"
         }
       });
-      return GeminiService.extractJson(response.text || "{}");
+      
+      if (!response.text) {
+        throw new Error("Model tidak mengembalikan teks. Periksa konfigurasi API Key atau Model ID.");
+      }
+      
+      return GeminiService.extractJson(response.text);
     } catch (e: any) {
-      throw new Error("AI Engine Gagal: " + e.message);
+      console.error("[GENERATE_QUIZ_ERROR]", e);
+      // Jika error mengandung pesan API key invalid, berikan saran yang lebih jelas
+      const errorMsg = e.message || "Unknown Error";
+      if (errorMsg.includes("API key not valid") || errorMsg.includes("400")) {
+        throw new Error(`Koneksi Gagal: API Key tidak valid atau Model ID (${modelId}) tidak didukung oleh provider.`);
+      }
+      throw new Error(`AI Engine Gagal (${modelId}): ` + errorMsg);
     }
   }
 
@@ -110,35 +128,45 @@ export class GeminiService {
     const aiSettings = await StorageService.getAISettings();
     const isExternal = aiSettings.provider === 'external';
     
-    let apiKey = process.env.API_KEY;
+    let apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
     let baseUrl = undefined;
     let modelId = 'gemini-3-pro-image-preview';
 
     if (isExternal) {
-      apiKey = aiSettings.customApiKey;
+      apiKey = aiSettings.customApiKey || apiKey;
       baseUrl = aiSettings.baseUrl;
       modelId = aiSettings.targetImageModel || modelId;
     }
 
-    const ai = new GoogleGenAI({ 
-      apiKey: apiKey,
-      server: baseUrl
-    } as any);
+    if (!apiKey) return "";
+
+    const options: any = { apiKey };
+    if (isExternal && baseUrl) {
+      options.baseUrl = baseUrl;
+    }
+
+    const ai = new GoogleGenAI(options);
 
     try {
-      const res = await ai.models.generateContent({
+      const response = await ai.models.generateContent({
         model: modelId,
-        contents: { parts: [{ text: `A clean, high-contrast educational illustration for classroom test. Black and white or simple colors. Minimalist style. Content: ${prompt}` }] }
+        contents: { parts: [{ text: `A clean, high-contrast educational illustration for classroom test. Black and white or simple colors. Minimalist style. Content: ${prompt}` }] },
+        config: {
+          imageConfig: {
+            aspectRatio: "1:1",
+            imageSize: "1K"
+          }
+        }
       });
       
-      const candidate = res.candidates?.[0];
-      if (!candidate?.content?.parts) return "";
+      if (!response.candidates?.[0]?.content?.parts) return "";
 
-      for (const part of candidate.content.parts) {
+      for (const part of response.candidates[0].content.parts) {
         if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
       }
       return "";
     } catch (e) { 
+      console.error("[GENERATE_VISUAL_ERROR]", e);
       return ""; 
     }
   }
