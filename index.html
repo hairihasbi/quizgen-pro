@@ -15,36 +15,35 @@
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
 
     <script>
-        // Engine Auto-Renderer yang sangat agresif (Solusi untuk React re-render)
-        window.executeMath = function(targetId) {
-            const target = targetId ? document.getElementById(targetId) : document.body;
-            if (!target) return;
-
-            const options = {
-                delimiters: [
-                    {left: '$$', right: '$$', display: true},
-                    {left: '$', right: '$', display: false},
-                    {left: '\\(', right: '\\)', display: false},
-                    {left: '\\[', right: '\\]', display: true}
-                ],
-                throwOnError: false,
-                trust: true,
-                strict: false
-            };
-
+        // Fungsi Render KaTeX yang aman
+        window.executeMath = function(targetElement) {
+            const target = targetElement || document.body;
             if (typeof renderMathInElement === 'function') {
-                renderMathInElement(target, options);
+                renderMathInElement(target, {
+                    delimiters: [
+                        {left: '$$', right: '$$', display: true},
+                        {left: '$', right: '$', display: false},
+                        {left: '\\(', right: '\\)', display: false},
+                        {left: '\\[', right: '\\]', display: true}
+                    ],
+                    throwOnError: false,
+                    trust: true
+                });
             }
         };
 
-        // Inisialisasi Observer: Pantau perubahan DOM untuk render otomatis
+        // Otomatisasi Rendering menggunakan MutationObserver
         document.addEventListener('DOMContentLoaded', () => {
             const observer = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                    if (mutation.addedNodes.length > 0) {
-                        window.executeMath();
-                    }
+                let shouldRender = false;
+                mutations.forEach(m => {
+                    if (m.addedNodes.length > 0) shouldRender = true;
                 });
+                if (shouldRender) {
+                    // Debounce sederhana agar tidak lag saat render masal
+                    clearTimeout(window.mathTimer);
+                    window.mathTimer = setTimeout(() => window.executeMath(), 100);
+                }
             });
             observer.observe(document.body, { childList: true, subtree: true });
         });
@@ -53,13 +52,13 @@
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #fffaf0; margin: 0; padding: 0; }
         .orange-gradient { background: linear-gradient(135deg, #ff8c00 0%, #ff4500 100%); }
-        .katex { font-size: 1.15em !important; }
+        .katex { font-size: 1.1em !important; }
         .katex-display { margin: 1em 0 !important; overflow-x: auto; overflow-y: hidden; }
         
         .print-container {
             width: 210mm;
             min-height: 297mm;
-            padding: 15mm !important; 
+            padding: 15mm; 
             margin: 0 auto;
             background: white;
             box-sizing: border-box;
@@ -83,12 +82,7 @@
     "react/": "https://esm.sh/react@^19.2.4/",
     "@google/genai": "https://esm.sh/@google/genai@^1.40.0",
     "@libsql/client": "https://esm.sh/@libsql/client@^0.17.0",
-    "crypto": "https://esm.sh/crypto@^1.0.1",
-    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4",
-    "vite": "https://esm.sh/vite@^7.3.1",
-    "puppeteer-core": "https://esm.sh/puppeteer-core@^24.37.5",
-    "@sparticuz/chromium": "https://esm.sh/@sparticuz/chromium@^143.0.4"
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0"
   }
 }
 </script>
