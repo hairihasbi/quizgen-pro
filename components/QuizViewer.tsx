@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Quiz, QuestionType } from '../types';
 import { Download, CheckCircle2, Loader2, Printer } from 'lucide-react';
 
@@ -54,13 +55,13 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
         });
       }));
 
-      // Berikan jeda lebih panjang (3 detik) agar gambar dan rumus matematika ter-render sempurna sebelum diunduh
-      await new Promise(r => setTimeout(r, 3000));
+      // Berikan jeda lebih panjang (4 detik) untuk memastikan semua aset siap
+      await new Promise(r => setTimeout(r, 4000));
 
       const isLandscape = exportMode === 'kisi-kisi';
       
       const opt = {
-        margin: 5, // Margin 5mm (0.5cm) untuk keamanan cetak agar tidak terpotong
+        margin: 15, // Margin 1.5 cm (15mm) sesuai permintaan
         filename: `${quiz.title.replace(/\s+/g, '_')}_GenZ.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { 
@@ -71,18 +72,19 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
           scrollX: 0,
           scrollY: 0,
           windowWidth: isLandscape ? 1600 : 1100,
-          imageTimeout: 15000,
+          imageTimeout: 20000,
           logging: false,
           backgroundColor: '#ffffff',
           onclone: (clonedDoc: Document) => {
-            // Reset body cloned document
+            // Reset body cloned document agar tidak ada offset
             clonedDoc.body.style.margin = '0';
             clonedDoc.body.style.padding = '0';
             
             const el = clonedDoc.getElementById('quiz-print-area');
             if (el) {
               el.style.margin = '0'; 
-              el.style.width = isLandscape ? '320mm' : '205mm'; 
+              // Lebar konten harus pas dengan area cetak (215mm - 30mm margin = 185mm)
+              el.style.width = isLandscape ? '300mm' : '185mm'; 
               el.style.boxShadow = 'none';
               el.style.padding = '0'; 
               el.style.transform = 'none';
@@ -109,7 +111,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
       
     } catch (e) {
       console.error("PDF Export Fail:", e);
-      alert("Gagal mengunduh. Pastikan semua gambar sudah tampil di layar sebelum klik download.");
+      alert("Gagal mengunduh. Pastikan koneksi stabil dan coba lagi.");
     } finally {
       setIsClientExporting(false);
     }
@@ -117,7 +119,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
 
   let globalIndex = 0;
 
-  return (
+  const content = (
     <div className="fixed inset-0 bg-gray-950/90 backdrop-blur-3xl z-[500] flex flex-col p-4 md:p-8 animate-in zoom-in-95 duration-300 print-modal-wrapper" role="dialog">
       <header className="flex flex-col lg:flex-row justify-between items-center bg-white p-6 rounded-[2.5rem] shadow-2xl mb-8 border border-orange-100 gap-6 no-print">
         <div className="flex items-center gap-5">
@@ -148,10 +150,9 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
       </header>
 
       <div className="flex-1 overflow-y-auto flex justify-center custom-scrollbar p-0 md:p-8 bg-black/20 rounded-[3rem]">
-        {/* CONTAINER UTAMA DENGAN LEBAR TETAP UNTUK PREVIEW YANG AKURAT */}
         <div 
           id="quiz-print-area" 
-          className={`print-container bg-white shadow-2xl relative ${exportMode === 'kisi-kisi' ? 'w-[320mm]' : 'w-[205mm]'}`} 
+          className={`print-container bg-white shadow-2xl relative ${exportMode === 'kisi-kisi' ? 'w-[300mm]' : 'w-[185mm]'}`} 
           style={{ color: 'black', margin: '0 auto' }}
         >
           {/* KOP SURAT PROFESIONAL */}
@@ -210,7 +211,6 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
                        <div className="flex-1">
                           <div className="font-bold text-justify mb-5 text-[11pt] leading-relaxed" dangerouslySetInnerHTML={{ __html: q.text }}></div>
                           
-                          {/* WRAPPER GAMBAR DENGAN WIDTH TETAP UNTUK MENCEGAH CLIPPING */}
                           {q.image && (
                              <div className="mb-6 p-1 bg-white inline-block border border-gray-100 rounded-lg shadow-sm" style={{ maxWidth: '100%' }}>
                                <img 
@@ -277,6 +277,8 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
       `}} />
     </div>
   );
+
+  return createPortal(content, document.body);
 };
 
 export default QuizViewer;
