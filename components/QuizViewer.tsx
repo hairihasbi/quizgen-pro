@@ -160,7 +160,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
             <h1 className="text-2xl font-black uppercase tracking-tighter leading-none mb-2">NASKAH EVALUASI HASIL BELAJAR</h1>
             <h2 className="text-lg font-bold uppercase tracking-tight">{quiz.subject} - {quiz.grade}</h2>
             <div className="flex justify-between items-end mt-4 px-2">
-                <div className="text-left text-[9pt] font-bold uppercase italic">Tahun Pelajaran 2024/2025</div>
+                <div className="text-left text-[9pt] font-bold uppercase italic">Evaluasi Hasil Belajar</div>
                 <div className="text-right text-[9pt] font-black border-2 border-black px-4 py-1 uppercase tracking-widest">UTAMA</div>
             </div>
           </div>
@@ -197,7 +197,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
             ) : (
               sortedQuestions.map((q, i) => {
                 globalIndex++;
-                const isNewPassage = q.passage && (i === 0 || sortedQuestions[i-1].passage !== q.passage);
+                const isNewPassage = q.passage && (i === 0 || sortedQuestions[i-1].passage?.trim() !== q.passage.trim());
                 return (
                   <div key={q.id} className="pdf-block mb-10" style={{ pageBreakInside: 'avoid' }}>
                     {isNewPassage && (
