@@ -27,7 +27,7 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
     imageQuestionsCount: 0,
     literacyMode: 'Tanpa Wacana',
     questionsPerPassage: 3, 
-    model: 'gemini-3-pro-preview'
+    model: 'gemini-3-flash-preview'
   });
 
   const [isGenerating, setIsGenerating] = useState(false);
@@ -168,13 +168,6 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
           </div>
         </div>
         <div className="flex items-center gap-10">
-            <div className="text-right border-r pr-10">
-               <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Pilih Intelligence</p>
-               <select className="bg-transparent font-black text-gray-800 outline-none text-right cursor-pointer" value={formData.model} onChange={e => setFormData({...formData, model: e.target.value})}>
-                  <option value="gemini-3-pro-preview">Gemini 3 Pro (Kualitas Tinggi)</option>
-                  <option value="gemini-3-flash-preview">Gemini 3 Flash (Kilat)</option>
-               </select>
-            </div>
             <div className="text-right">
                <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Sisa Kredit</p>
                <p className="text-3xl font-black text-orange-600 tracking-tight">{user.credits} 🪙</p>
@@ -281,7 +274,7 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
               <div className="space-y-5">
                  <div className="space-y-1">
                     <label className="text-[9px] font-black text-gray-400 uppercase ml-2">Jumlah Soal</label>
-                    <input type="number" className="w-full px-6 py-4 rounded-2xl bg-gray-50 font-black outline-none border-2 border-transparent focus:border-orange-500" value={formData.count} onChange={e => setFormData({...formData, count: Math.min(20, parseInt(e.target.value) || 1)})} />
+                    <input type="number" className="w-full px-6 py-4 rounded-2xl bg-gray-50 font-black outline-none border-2 border-transparent focus:border-orange-500" value={formData.count} onChange={e => setFormData({...formData, count: Math.min(50, parseInt(e.target.value) || 1)})} />
                  </div>
                  <div className="space-y-1">
                     <label className="text-[9px] font-black text-gray-400 uppercase ml-2">Tingkat Kesulitan Dasar</label>
