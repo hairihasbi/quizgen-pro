@@ -60,7 +60,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
       const isLandscape = exportMode === 'kisi-kisi';
       
       const opt = {
-        margin: 0.5, // Margin 0.5 mm pada semua sisi
+        margin: 5, // Margin 5mm (0.5cm) untuk keamanan cetak agar tidak terpotong
         filename: `${quiz.title.replace(/\s+/g, '_')}_GenZ.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { 
@@ -75,10 +75,14 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
           logging: false,
           backgroundColor: '#ffffff',
           onclone: (clonedDoc: Document) => {
+            // Reset body cloned document
+            clonedDoc.body.style.margin = '0';
+            clonedDoc.body.style.padding = '0';
+            
             const el = clonedDoc.getElementById('quiz-print-area');
             if (el) {
-              el.style.margin = '0 auto'; 
-              el.style.width = isLandscape ? '329mm' : '214mm'; // Folio (330/215) - 1mm total margin
+              el.style.margin = '0'; 
+              el.style.width = isLandscape ? '320mm' : '205mm'; 
               el.style.boxShadow = 'none';
               el.style.padding = '0'; 
               el.style.transform = 'none';
@@ -147,7 +151,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
         {/* CONTAINER UTAMA DENGAN LEBAR TETAP UNTUK PREVIEW YANG AKURAT */}
         <div 
           id="quiz-print-area" 
-          className={`print-container bg-white shadow-2xl relative ${exportMode === 'kisi-kisi' ? 'w-[330mm]' : 'w-[215mm]'}`} 
+          className={`print-container bg-white shadow-2xl relative ${exportMode === 'kisi-kisi' ? 'w-[320mm]' : 'w-[205mm]'}`} 
           style={{ color: 'black', margin: '0 auto' }}
         >
           {/* KOP SURAT PROFESIONAL */}
