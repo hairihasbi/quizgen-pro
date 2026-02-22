@@ -59,7 +59,7 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
     if (!formData.title || !formData.topic) return alert('Lengkapi Judul dan Topik!');
     setIsGenerating(true);
     
-    realtimeService.connect(crypto.randomUUID().substring(0,8), (event: AIProgressEvent) => {
+    realtimeService.connect(window.crypto.randomUUID().substring(0,8), (event: AIProgressEvent) => {
       setProgress(event.percentage);
       setStatusMsg(event.message);
     });
@@ -73,7 +73,7 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
         if (formData.imageQuestionsCount > 0 && idx < Math.min(formData.imageQuestionsCount, 3)) {
           imageUrl = await gemini.generateVisual(q.text);
         }
-        return { ...q, id: crypto.randomUUID(), image: imageUrl };
+        return { ...q, id: window.crypto.randomUUID(), image: imageUrl };
       }));
 
       setWorkbenchData({ ...result, questions: processedQuestions });
@@ -87,7 +87,7 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
 
   const saveToDatabase = async () => {
     const newQuiz: Quiz = {
-      id: crypto.randomUUID(),
+      id: window.crypto.randomUUID(),
       title: formData.title,
       subject: formData.subject,
       level: formData.level,

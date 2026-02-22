@@ -50,7 +50,7 @@ const Register: React.FC<RegisterProps> = ({ onBack }) => {
       const passwordHash = await StorageService.hashPassword(formData.password);
 
       const newUser: User = {
-        id: crypto.randomUUID(),
+        id: window.crypto.randomUUID(),
         username: sanitizedUsername,
         fullName: StorageService.sanitizeInput(formData.fullName),
         email: sanitizedEmail,
@@ -65,7 +65,7 @@ const Register: React.FC<RegisterProps> = ({ onBack }) => {
       await StorageService.saveUsers([...users, newUser]);
 
       await StorageService.addLog({
-        id: crypto.randomUUID(),
+        id: window.crypto.randomUUID(),
         timestamp: new Date().toISOString(),
         category: LogCategory.SECURITY,
         action: 'USER_REGISTERED',

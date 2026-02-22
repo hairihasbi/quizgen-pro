@@ -14,13 +14,13 @@ const GlobalSearch: React.FC = () => {
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
 
   useEffect(() => {
-    const fetch = async () => {
+    const fetchData = async () => {
       setLoading(true);
       const data = await StorageService.getQuizzes();
       setAllQuizzes(data);
       setLoading(false);
     };
-    fetch();
+    fetchData();
   }, []);
 
   const allAvailableTags = useMemo(() => {
