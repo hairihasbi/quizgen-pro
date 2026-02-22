@@ -69,28 +69,26 @@ export class GeminiService {
     const aiSettings = await StorageService.getAISettings();
     const isExternal = aiSettings.provider === 'external';
     
-    // Gunakan GEMINI_API_KEY sebagai default sesuai standar platform
-    let apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-    let baseUrl = undefined;
-    let modelId = params.model || 'gemini-3-flash-preview';
+    // Prioritas API Key: 
+    // 1. Custom Key dari Settings (jika mode eksternal)
+    // 2. API_KEY (Environment variable standar platform)
+    // 3. GEMINI_API_KEY (Environment variable alternatif)
+    let apiKey = isExternal ? aiSettings.customApiKey : (process.env.API_KEY || process.env.GEMINI_API_KEY);
+    
+    // Jika mode eksternal tapi key kosong, coba fallback ke env
+    if (isExternal && !apiKey) {
+      apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+    }
 
-    if (isExternal) {
-      // Jika eksternal, prioritaskan key dari settings
-      apiKey = aiSettings.customApiKey || apiKey;
-      baseUrl = aiSettings.baseUrl;
-      modelId = aiSettings.targetModel || modelId;
+    let modelId = params.model || 'gemini-3-flash-preview';
+    if (isExternal && aiSettings.targetModel) {
+      modelId = aiSettings.targetModel;
     }
 
     if (!apiKey) {
-      throw new Error("API Key tidak ditemukan. Silakan konfigurasi di menu Pengaturan atau periksa environment variable.");
+      throw new Error("API Key tidak ditemukan. Silakan konfigurasi di menu Pengaturan.");
     }
 
-    const options: any = { apiKey };
-    if (isExternal && baseUrl) {
-      options.baseUrl = baseUrl;
-    }
-
-    const ai = new GoogleGenAI(options);
     const system = GeminiService.getSystemInstruction(params);
     const prompt = `TUGAS: BUATKAN ${params.count} SOAL ${params.subject} TENTANG ${params.topic}.
     JENJANG: ${params.level} ${params.grade}.
@@ -98,6 +96,41 @@ export class GeminiService {
     TINGKAT KESULITAN: ${params.difficulty}.
     VARIAN LEVEL: ${params.cognitiveLevels.join(', ')}.`;
 
+    // Jika mode eksternal, gunakan fetch untuk kompatibilitas lebih luas (LiteLLM/OpenAI format)
+    if (isExternal && aiSettings.baseUrl) {
+      try {
+        const response = await fetch(`${aiSettings.baseUrl.replace(/\/$/, '')}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: modelId,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: prompt }
+            ],
+            response_format: { type: 'json_object' }
+          })
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error?.message || `HTTP Error ${response.status}`);
+        }
+
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content;
+        return GeminiService.extractJson(content || "{}");
+      } catch (e: any) {
+        console.error("[EXTERNAL_AI_ERROR]", e);
+        throw new Error(`External Engine Gagal (${modelId}): ` + e.message);
+      }
+    }
+
+    // Mode Native Gemini
+    const ai = new GoogleGenAI({ apiKey });
     try {
       const response = await ai.models.generateContent({
         model: modelId,
@@ -109,18 +142,13 @@ export class GeminiService {
       });
       
       if (!response.text) {
-        throw new Error("Model tidak mengembalikan teks. Periksa konfigurasi API Key atau Model ID.");
+        throw new Error("Model tidak mengembalikan teks.");
       }
       
       return GeminiService.extractJson(response.text);
     } catch (e: any) {
-      console.error("[GENERATE_QUIZ_ERROR]", e);
-      // Jika error mengandung pesan API key invalid, berikan saran yang lebih jelas
-      const errorMsg = e.message || "Unknown Error";
-      if (errorMsg.includes("API key not valid") || errorMsg.includes("400")) {
-        throw new Error(`Koneksi Gagal: API Key tidak valid atau Model ID (${modelId}) tidak didukung oleh provider.`);
-      }
-      throw new Error(`AI Engine Gagal (${modelId}): ` + errorMsg);
+      console.error("[NATIVE_AI_ERROR]", e);
+      throw new Error(`Native Engine Gagal (${modelId}): ` + (e.message || "Unknown Error"));
     }
   }
 
@@ -128,24 +156,22 @@ export class GeminiService {
     const aiSettings = await StorageService.getAISettings();
     const isExternal = aiSettings.provider === 'external';
     
-    let apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-    let baseUrl = undefined;
-    let modelId = 'gemini-3-pro-image-preview';
+    let apiKey = isExternal ? aiSettings.customApiKey : (process.env.API_KEY || process.env.GEMINI_API_KEY);
+    if (isExternal && !apiKey) {
+        apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+    }
 
-    if (isExternal) {
-      apiKey = aiSettings.customApiKey || apiKey;
-      baseUrl = aiSettings.baseUrl;
-      modelId = aiSettings.targetImageModel || modelId;
+    let modelId = 'gemini-3-pro-image-preview';
+    if (isExternal && aiSettings.targetImageModel) {
+      modelId = aiSettings.targetImageModel;
     }
 
     if (!apiKey) return "";
 
-    const options: any = { apiKey };
-    if (isExternal && baseUrl) {
-      options.baseUrl = baseUrl;
-    }
-
-    const ai = new GoogleGenAI(options);
+    // Visual generation biasanya spesifik Gemini, tetap gunakan SDK jika memungkinkan
+    // Namun jika eksternal, kita asumsikan baseUrl mungkin tidak mendukung generateContent standar
+    // Untuk saat ini, visual tetap menggunakan SDK Gemini karena format outputnya unik
+    const ai = new GoogleGenAI({ apiKey } as any);
 
     try {
       const response = await ai.models.generateContent({
