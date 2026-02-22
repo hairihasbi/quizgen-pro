@@ -60,7 +60,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
       const isLandscape = exportMode === 'kisi-kisi';
       
       const opt = {
-        margin: 15, // Margin 1.5 cm (15mm) pada semua sisi
+        margin: 0.5, // Margin 0.5 mm pada semua sisi
         filename: `${quiz.title.replace(/\s+/g, '_')}_GenZ.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { 
@@ -70,17 +70,17 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
           letterRendering: true,
           scrollX: 0,
           scrollY: 0,
-          windowWidth: isLandscape ? 1400 : 1000,
+          windowWidth: isLandscape ? 1600 : 1100,
           imageTimeout: 15000,
           logging: false,
           backgroundColor: '#ffffff',
           onclone: (clonedDoc: Document) => {
             const el = clonedDoc.getElementById('quiz-print-area');
             if (el) {
-              el.style.margin = '0 auto'; // Memastikan konten berada di tengah
-              el.style.width = isLandscape ? '267mm' : '180mm'; // Menyesuaikan lebar (A4 - 30mm total margin)
+              el.style.margin = '0 auto'; 
+              el.style.width = isLandscape ? '329mm' : '214mm'; // Folio (330/215) - 1mm total margin
               el.style.boxShadow = 'none';
-              el.style.padding = '0'; // Padding 0 karena margin diatur oleh html2pdf
+              el.style.padding = '0'; 
               el.style.transform = 'none';
               el.style.position = 'relative';
               el.style.display = 'block';
@@ -90,7 +90,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
         },
         jsPDF: { 
           unit: 'mm', 
-          format: 'a4', 
+          format: [215, 330], // Ukuran kertas FOLIO
           orientation: isLandscape ? 'landscape' : 'portrait',
           compress: true 
         },
@@ -147,7 +147,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
         {/* CONTAINER UTAMA DENGAN LEBAR TETAP UNTUK PREVIEW YANG AKURAT */}
         <div 
           id="quiz-print-area" 
-          className={`print-container bg-white shadow-2xl relative ${exportMode === 'kisi-kisi' ? 'w-[297mm]' : 'w-[210mm]'}`} 
+          className={`print-container bg-white shadow-2xl relative ${exportMode === 'kisi-kisi' ? 'w-[330mm]' : 'w-[215mm]'}`} 
           style={{ color: 'black', margin: '0 auto' }}
         >
           {/* KOP SURAT PROFESIONAL */}
@@ -257,8 +257,8 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
       <style dangerouslySetInnerHTML={{ __html: `
         @media screen {
             .print-container {
-                padding: 20mm;
-                min-height: 297mm;
+                padding: 10mm;
+                min-height: 330mm;
             }
         }
         @media print {
