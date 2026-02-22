@@ -54,29 +54,39 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
         });
       }));
 
-      // Berikan jeda pendek untuk stabilitas layout
-      await new Promise(r => setTimeout(r, 800));
+      // Berikan jeda lebih panjang (3 detik) agar gambar dan rumus matematika ter-render sempurna sebelum diunduh
+      await new Promise(r => setTimeout(r, 3000));
 
       const isLandscape = exportMode === 'kisi-kisi';
       
       const opt = {
-        margin: [15, 15, 15, 15], // Margin seimbang (Atas, Kiri, Bawah, Kanan)
+        margin: 15, // Margin 1.5 cm (15mm) pada semua sisi
         filename: `${quiz.title.replace(/\s+/g, '_')}_GenZ.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { 
-          scale: 2, // Skala 2 sudah sangat cukup untuk cetak A4
+          scale: 2,
           useCORS: true, 
-          allowTaint: true,
+          allowTaint: false,
           letterRendering: true,
-          // FIX KOORDINAT: Mencegah teks terpotong di kiri (ALUASI -> EVALUASI)
           scrollX: 0,
           scrollY: 0,
-          x: 0,
-          y: 0,
-          windowWidth: isLandscape ? 1123 : 794, // Presisi A4 px (96 DPI)
-          imageTimeout: 0,
+          windowWidth: isLandscape ? 1400 : 1000,
+          imageTimeout: 15000,
           logging: false,
-          backgroundColor: '#ffffff'
+          backgroundColor: '#ffffff',
+          onclone: (clonedDoc: Document) => {
+            const el = clonedDoc.getElementById('quiz-print-area');
+            if (el) {
+              el.style.margin = '0 auto'; // Memastikan konten berada di tengah
+              el.style.width = isLandscape ? '267mm' : '180mm'; // Menyesuaikan lebar (A4 - 30mm total margin)
+              el.style.boxShadow = 'none';
+              el.style.padding = '0'; // Padding 0 karena margin diatur oleh html2pdf
+              el.style.transform = 'none';
+              el.style.position = 'relative';
+              el.style.display = 'block';
+              el.style.overflow = 'visible';
+            }
+          }
         },
         jsPDF: { 
           unit: 'mm', 
@@ -198,13 +208,12 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
                           
                           {/* WRAPPER GAMBAR DENGAN WIDTH TETAP UNTUK MENCEGAH CLIPPING */}
                           {q.image && (
-                             <div className="mb-6 p-1 bg-white inline-block border border-gray-100 rounded-lg shadow-sm overflow-hidden" style={{ maxWidth: '100%' }}>
+                             <div className="mb-6 p-1 bg-white inline-block border border-gray-100 rounded-lg shadow-sm" style={{ maxWidth: '100%' }}>
                                <img 
                                  src={q.image} 
                                  crossOrigin="anonymous"
                                  className="max-w-full md:max-w-md max-h-[75mm] object-contain block" 
                                  alt="Visual Stimulus" 
-                                 style={{ display: 'block' }}
                                />
                              </div>
                           )}
@@ -248,7 +257,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
       <style dangerouslySetInnerHTML={{ __html: `
         @media screen {
             .print-container {
-                padding: 20mm !important;
+                padding: 20mm;
                 min-height: 297mm;
             }
         }
