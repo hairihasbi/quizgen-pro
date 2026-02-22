@@ -40,7 +40,7 @@ const PaymentSettingsPanel: React.FC = () => {
     setTimeout(() => setIsClicked(false), 300);
 
     const newPkg: PaymentPackage = {
-      id: crypto.randomUUID(),
+      id: window.crypto.randomUUID(),
       name: 'Paket Baru',
       credits: 0,
       price: 0,

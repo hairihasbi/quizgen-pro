@@ -61,7 +61,7 @@ const UserManagement: React.FC = () => {
       });
       
       await StorageService.addLog({
-        id: crypto.randomUUID(),
+        id: window.crypto.randomUUID(),
         timestamp: new Date().toISOString(),
         category: LogCategory.SECURITY,
         action: 'USER_APPROVED',
@@ -98,7 +98,7 @@ const UserManagement: React.FC = () => {
       });
       
       await StorageService.addLog({
-        id: crypto.randomUUID(),
+        id: window.crypto.randomUUID(),
         timestamp: new Date().toISOString(),
         category: LogCategory.SECURITY,
         action: 'USER_REJECTED',
@@ -148,7 +148,7 @@ const UserManagement: React.FC = () => {
       const passwordHash = await StorageService.hashPassword(newUser.password);
 
       const userObj: User = {
-        id: crypto.randomUUID(),
+        id: window.crypto.randomUUID(),
         username: sanitizedUsername,
         fullName: StorageService.sanitizeInput(newUser.fullName),
         email: sanitizedEmail,
@@ -164,7 +164,7 @@ const UserManagement: React.FC = () => {
       await StorageService.saveUsers([...currentUsers, userObj]);
       
       await StorageService.addLog({
-        id: crypto.randomUUID(),
+        id: window.crypto.randomUUID(),
         timestamp: new Date().toISOString(),
         category: LogCategory.SECURITY,
         action: 'ADD_USER_BY_ADMIN',
@@ -239,7 +239,7 @@ const UserManagement: React.FC = () => {
                   <td className="px-8 py-6">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600 font-black">
-                        {u.username[0].toUpperCase()}
+                        {(u.username || 'U')[0].toUpperCase()}
                       </div>
                       <div>
                         <div className="font-bold text-gray-800">{u.fullName || u.username}</div>
