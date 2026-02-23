@@ -125,9 +125,10 @@ export default async function handler(req: any, res: any) {
         ` : `
           ${Object.entries(grouped).map(([type, questions], gIdx) => `
             <div class="type-header">${String.fromCharCode(65 + gIdx)}. ${type}</div>
-            ${questions.map((q: any) => {
+            ${questions.map((q: any, idx: number) => {
               globalCounter++;
-              const isNewPassage = q.passage && (questions.indexOf(q) === 0 || questions[questions.indexOf(q)-1].passage !== q.passage);
+              const normalize = (s?: string) => (s || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+              const isNewPassage = q.passage && (idx === 0 || normalize(questions[idx-1].passage) !== normalize(q.passage));
               return `
                 ${isNewPassage ? `<div class="passage"><strong>WACANA:</strong><br/>${q.passage}</div>` : ''}
                 <div class="question-item">
