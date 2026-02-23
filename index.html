@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GenZ QuizGen Pro</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Amiri&family=Noto+Sans+JP&family=Noto+Serif+KR&family=Noto+Sans+TC&display=swap" rel="stylesheet">
     
     <!-- Library PDF & KaTeX -->
@@ -49,51 +48,6 @@
         });
     </script>
 
-    <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #fffaf0; margin: 0; padding: 0; }
-        .orange-gradient { background: linear-gradient(135deg, #ff8c00 0%, #ff4500 100%); }
-        .katex { font-size: 1.1em !important; }
-        .katex-display { margin: 1em 0 !important; overflow-x: auto; overflow-y: hidden; }
-        
-        .print-container {
-            width: 185mm; /* 215mm - 30mm margin */
-            min-height: 300mm;
-            padding: 0; 
-            margin: 0 auto;
-            background: white;
-            box-sizing: border-box;
-            position: relative;
-            color: black;
-        }
-
-        @media print {
-            @page { margin: 15mm; size: 215mm 330mm; }
-            body { background: white !important; }
-            .no-print { display: none !important; }
-            
-            /* Hide everything by default */
-            body > * { display: none !important; }
-            
-            /* Show only the portal-ed modal */
-            body > .print-modal-wrapper { 
-                display: flex !important; 
-                position: static !important;
-                width: 100% !important;
-                height: auto !important;
-                background: white !important;
-                padding: 0 !important;
-                margin: 0 !important;
-                overflow: visible !important;
-            }
-            
-            .print-modal-wrapper .print-container {
-                width: 100% !important;
-                box-shadow: none !important;
-                margin: 0 !important;
-                padding: 0 !important;
-            }
-        }
-    </style>
 <script type="importmap">
 {
   "imports": {
