@@ -197,7 +197,8 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
             ) : (
               sortedQuestions.map((q, i) => {
                 globalIndex++;
-                const isNewPassage = q.passage && (i === 0 || sortedQuestions[i-1].passage?.trim() !== q.passage.trim());
+                const normalize = (s?: string) => s?.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim() || '';
+                const isNewPassage = q.passage && (i === 0 || normalize(sortedQuestions[i-1].passage) !== normalize(q.passage));
                 return (
                   <div key={q.id} className="pdf-block mb-10" style={{ pageBreakInside: 'avoid' }}>
                     {isNewPassage && (
