@@ -55,7 +55,8 @@ export class GeminiService {
           "answer": "String atau Array",
           "explanation": "Pembahasan",
           "type": "Jenis soal",
-          "indicator": "Tujuan/indikator soal",
+          "indicator": "Indikator soal (peserta didik dapat...)",
+          "learningOutcome": "Capaian Pembelajaran (CP) yang relevan",
           "cognitiveLevel": "Tingkatan Bloom"
         }
       ],
