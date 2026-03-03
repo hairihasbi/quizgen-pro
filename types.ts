@@ -42,6 +42,7 @@ export interface Question {
   citation?: string; 
   indicator: string;
   competency: string;
+  learningOutcome?: string;
   topic: string;
   cognitiveLevel: string;
   subject?: string;
