@@ -13,6 +13,7 @@ interface QuizViewerProps {
 const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = false }) => {
   const [showAnswer, setShowAnswer] = useState(false);
   const [exportMode, setExportMode] = useState<'soal' | 'kisi-kisi' | 'lengkap'>('soal');
+  const [showGridAnswers, setShowGridAnswers] = useState(true);
   const [isClientExporting, setIsClientExporting] = useState(false);
 
   useEffect(() => {
@@ -136,6 +137,19 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
              <button onClick={() => { setExportMode('kisi-kisi'); setShowAnswer(false); }} className={`px-5 py-2.5 rounded-xl text-[10px] font-black transition-all ${exportMode === 'kisi-kisi' ? 'bg-white text-orange-600 shadow-md' : 'text-orange-300 hover:text-orange-400'}`}>KISI-KISI</button>
              <button onClick={() => { setExportMode('lengkap'); setShowAnswer(true); }} className={`px-5 py-2.5 rounded-xl text-[10px] font-black transition-all ${exportMode === 'lengkap' ? 'bg-white text-orange-600 shadow-md' : 'text-orange-300 hover:text-orange-400'}`}>PEMBAHASAN</button>
           </div>
+
+          {exportMode === 'kisi-kisi' && (
+            <div className="flex items-center gap-2 bg-orange-50 px-4 py-2 rounded-2xl border border-orange-100">
+               <input 
+                 type="checkbox" 
+                 id="toggle-grid-answers"
+                 checked={showGridAnswers}
+                 onChange={(e) => setShowGridAnswers(e.target.checked)}
+                 className="w-4 h-4 accent-orange-500 cursor-pointer"
+               />
+               <label htmlFor="toggle-grid-answers" className="text-[10px] font-black text-orange-600 cursor-pointer uppercase">Tampil Kunci</label>
+            </div>
+          )}
           {!hideDownload && (
             <div className="flex gap-2">
                <button onClick={() => window.print()} className="p-4 bg-gray-100 text-gray-600 rounded-2xl hover:bg-gray-200 transition-all"><Printer size={18} /></button>
@@ -173,22 +187,26 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
                    <thead>
                       <tr className="bg-gray-100">
                          <th className="border-[1.5px] border-black p-3 w-10 text-center uppercase font-black">NO</th>
+                         <th className="border-[1.5px] border-black p-3 text-left uppercase font-black">CAPAIAN PEMBELAJARAN</th>
                          <th className="border-[1.5px] border-black p-3 text-left uppercase font-black">INDIKATOR SOAL</th>
                          <th className="border-[1.5px] border-black p-3 w-20 text-center uppercase font-black">LEVEL</th>
                          <th className="border-[1.5px] border-black p-3 w-32 text-center uppercase font-black">BENTUK</th>
-                         <th className="border-[1.5px] border-black p-3 w-20 text-center uppercase font-black">KUNCI</th>
+                         {showGridAnswers && <th className="border-[1.5px] border-black p-3 w-20 text-center uppercase font-black">KUNCI</th>}
                       </tr>
                    </thead>
                    <tbody>
                       {sortedQuestions.map((q, i) => (
                         <tr key={q.id}>
                           <td className="border-[1.5px] border-black p-3 text-center font-bold">{i+1}</td>
+                          <td className="border-[1.5px] border-black p-3 text-left font-medium">{q.learningOutcome || '-'}</td>
                           <td className="border-[1.5px] border-black p-3 italic leading-relaxed">Disajikan {q.type.toLowerCase()}, peserta didik dapat {q.indicator}</td>
                           <td className="border-[1.5px] border-black p-3 text-center font-black uppercase">{q.cognitiveLevel?.split(' ')[0] || 'L2'}</td>
                           <td className="border-[1.5px] border-black p-3 text-center font-bold uppercase">{q.type}</td>
-                          <td className="border-[1.5px] border-black p-3 text-center font-black text-orange-600">
-                            {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}
-                          </td>
+                          {showGridAnswers && (
+                            <td className="border-[1.5px] border-black p-3 text-center font-black text-orange-600">
+                              {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}
+                            </td>
+                          )}
                         </tr>
                       ))}
                    </tbody>
