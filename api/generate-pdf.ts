@@ -105,19 +105,26 @@ export default async function handler(req: any, res: any) {
           <div style="text-align:center; text-decoration:underline; font-weight:800; font-family:'Plus Jakarta Sans'; margin-bottom:20px;">MATRIKS KISI-KISI SOAL</div>
           <table class="kisi-table">
             <thead>
-              <tr><th>NO</th><th>KD / CP</th><th>MATERI</th><th>INDIKATOR</th><th>LEVEL</th><th>BENTUK</th><th>NO</th><th>KUNCI</th></tr>
+              <tr>
+                <th>NO</th>
+                <th>CAPAIAN PEMBELAJARAN</th>
+                <th>INDIKATOR</th>
+                <th>LEVEL</th>
+                <th>BENTUK</th>
+                <th>NO</th>
+                ${showAnswer ? '<th>KUNCI</th>' : ''}
+              </tr>
             </thead>
             <tbody>
               ${sortedQuestions.map((q: any, i: number) => `
                 <tr>
                   <td align="center">${i + 1}</td>
-                  <td>${q.competency || '-'}</td>
-                  <td>${q.topic}</td>
+                  <td>${q.learningOutcome || '-'}</td>
                   <td>${q.indicator}</td>
                   <td align="center">${mapLevel(q.cognitiveLevel)}</td>
                   <td align="center">${q.type}</td>
                   <td align="center">${i + 1}</td>
-                  <td align="center">${Array.isArray(q.answer) ? q.answer.join(',') : q.answer}</td>
+                  ${showAnswer ? `<td align="center">${Array.isArray(q.answer) ? q.answer.join(',') : q.answer}</td>` : ''}
                 </tr>
               `).join('')}
             </tbody>
