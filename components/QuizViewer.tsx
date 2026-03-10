@@ -1,8 +1,8 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Quiz, QuestionType } from '../types';
-import { Download, CheckCircle2, Loader2, Printer } from 'lucide-react';
+import { Quiz, QuestionType, HeaderConfig } from '../types';
+import { Download, CheckCircle2, Loader2, Printer, Settings, Image as ImageIcon, FileText, Trash2, Upload } from 'lucide-react';
 
 interface QuizViewerProps {
   quiz: Quiz;
@@ -16,6 +16,24 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
   const [showGridAnswers, setShowGridAnswers] = useState(true);
   const [isTwoColumn, setIsTwoColumn] = useState(false);
   const [isClientExporting, setIsClientExporting] = useState(false);
+  const [isHeaderSettingsOpen, setIsHeaderSettingsOpen] = useState(false);
+  const [headerConfig, setHeaderConfig] = useState<HeaderConfig>({ type: 'default' });
+
+  useEffect(() => {
+    const saved = localStorage.getItem('quiz_header_config');
+    if (saved) {
+      try {
+        setHeaderConfig(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to load header config", e);
+      }
+    }
+  }, []);
+
+  const saveHeaderConfig = (config: HeaderConfig) => {
+    setHeaderConfig(config);
+    localStorage.setItem('quiz_header_config', JSON.stringify(config));
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -164,6 +182,13 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
                <label htmlFor="toggle-two-column" className="text-[10px] font-black text-orange-600 cursor-pointer uppercase">2 Kolom</label>
             </div>
           )}
+
+          <button 
+            onClick={() => setIsHeaderSettingsOpen(true)}
+            className="flex items-center gap-2 bg-orange-50 px-4 py-2 rounded-2xl border border-orange-100 text-[10px] font-black text-orange-600 hover:bg-orange-100 transition-all uppercase"
+          >
+            <Settings size={14} /> Atur Kop
+          </button>
           
           {!hideDownload && (
             <div className="flex gap-2">
@@ -185,14 +210,44 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
           style={{ color: 'black', margin: '0 auto' }}
         >
           {/* KOP SURAT PROFESIONAL */}
-          <div className="text-center mb-10 border-b-[3.5px] border-black pb-4">
-            <h1 className="text-2xl font-black uppercase tracking-tighter leading-none mb-2">NASKAH EVALUASI HASIL BELAJAR</h1>
-            <h2 className="text-lg font-bold uppercase tracking-tight">{quiz.subject} - {quiz.grade}</h2>
-            <div className="flex justify-between items-end mt-4 px-2">
-                <div className="text-left text-[9pt] font-bold uppercase italic">Evaluasi Hasil Belajar</div>
-                <div className="text-right text-[9pt] font-black border-2 border-black px-4 py-1 uppercase tracking-widest">UTAMA</div>
+          {headerConfig.type === 'default' ? (
+            <div className="text-center mb-10 border-b-[3.5px] border-black pb-4">
+              <h1 className="text-2xl font-black uppercase tracking-tighter leading-none mb-2">NASKAH EVALUASI HASIL BELAJAR</h1>
+              <h2 className="text-lg font-bold uppercase tracking-tight">{quiz.subject} - {quiz.grade}</h2>
+              <div className="flex justify-between items-end mt-4 px-2">
+                  <div className="text-left text-[9pt] font-bold uppercase italic">Evaluasi Hasil Belajar</div>
+                  <div className="text-right text-[9pt] font-black border-2 border-black px-4 py-1 uppercase tracking-widest">UTAMA</div>
+              </div>
             </div>
-          </div>
+          ) : headerConfig.type === 'image' && headerConfig.imageUrl ? (
+            <div className="mb-10">
+              <img src={headerConfig.imageUrl} className="w-full block" alt="Kop Instansi" />
+            </div>
+          ) : headerConfig.type === 'template' && headerConfig.templateData ? (
+            <div className="flex items-center gap-6 mb-8 border-b-[3.5px] border-black pb-6">
+              {headerConfig.templateData.logoUrl && (
+                <img src={headerConfig.templateData.logoUrl} className="w-24 h-24 object-contain" alt="Logo Instansi" />
+              )}
+              <div className="flex-1 text-center">
+                <h1 className="text-xl font-black uppercase leading-tight mb-1">{headerConfig.templateData.schoolName}</h1>
+                <p className="text-[10pt] font-bold leading-tight mb-1">{headerConfig.templateData.address}</p>
+                <div className="flex justify-center gap-4 text-[9pt] font-medium italic">
+                  {headerConfig.templateData.phone && <span>Telp: {headerConfig.templateData.phone}</span>}
+                  {headerConfig.templateData.email && <span>Email: {headerConfig.templateData.email}</span>}
+                  {headerConfig.templateData.website && <span>Web: {headerConfig.templateData.website}</span>}
+                </div>
+              </div>
+            </div>
+          ) : (
+             <div className="text-center mb-10 border-b-[3.5px] border-black pb-4">
+              <h1 className="text-2xl font-black uppercase tracking-tighter leading-none mb-2">NASKAH EVALUASI HASIL BELAJAR</h1>
+              <h2 className="text-lg font-bold uppercase tracking-tight">{quiz.subject} - {quiz.grade}</h2>
+              <div className="flex justify-between items-end mt-4 px-2">
+                  <div className="text-left text-[9pt] font-bold uppercase italic">Evaluasi Hasil Belajar</div>
+                  <div className="text-right text-[9pt] font-black border-2 border-black px-4 py-1 uppercase tracking-widest">UTAMA</div>
+              </div>
+            </div>
+          )}
 
           <div className={`space-y-12 ${isTwoColumn && exportMode !== 'kisi-kisi' ? 'columns-2' : ''}`}>
             {exportMode === 'kisi-kisi' ? (
@@ -308,6 +363,184 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
         </div>
       </div>
       
+      {isHeaderSettingsOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[600] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-2xl overflow-hidden shadow-2xl animate-in zoom-in-95">
+            <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-orange-50/50">
+              <div>
+                <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight">Pengaturan Kop Instansi</h3>
+                <p className="text-xs text-gray-500 font-bold uppercase mt-1">Kustomisasi Header Naskah Soal</p>
+              </div>
+              <button onClick={() => setIsHeaderSettingsOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white rounded-full shadow-sm hover:text-rose-500 transition-colors font-bold">✕</button>
+            </div>
+            
+            <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto custom-scrollbar">
+              <div className="grid grid-cols-3 gap-4">
+                <button 
+                  onClick={() => saveHeaderConfig({ ...headerConfig, type: 'default' })}
+                  className={`p-6 rounded-3xl border-2 transition-all flex flex-col items-center gap-3 ${headerConfig.type === 'default' ? 'border-orange-500 bg-orange-50' : 'border-gray-100 hover:border-orange-200'}`}
+                >
+                  <FileText className={headerConfig.type === 'default' ? 'text-orange-500' : 'text-gray-400'} />
+                  <span className="text-[10px] font-black uppercase">Default</span>
+                </button>
+                <button 
+                  onClick={() => saveHeaderConfig({ ...headerConfig, type: 'image' })}
+                  className={`p-6 rounded-3xl border-2 transition-all flex flex-col items-center gap-3 ${headerConfig.type === 'image' ? 'border-orange-500 bg-orange-50' : 'border-gray-100 hover:border-orange-200'}`}
+                >
+                  <ImageIcon className={headerConfig.type === 'image' ? 'text-orange-500' : 'text-gray-400'} />
+                  <span className="text-[10px] font-black uppercase">Unggah Gambar</span>
+                </button>
+                <button 
+                  onClick={() => saveHeaderConfig({ ...headerConfig, type: 'template' })}
+                  className={`p-6 rounded-3xl border-2 transition-all flex flex-col items-center gap-3 ${headerConfig.type === 'template' ? 'border-orange-500 bg-orange-50' : 'border-gray-100 hover:border-orange-200'}`}
+                >
+                  <Settings className={headerConfig.type === 'template' ? 'text-orange-500' : 'text-gray-400'} />
+                  <span className="text-[10px] font-black uppercase">Template</span>
+                </button>
+              </div>
+
+              {headerConfig.type === 'image' && (
+                <div className="space-y-4 animate-in slide-in-from-bottom-4">
+                  <div className="border-2 border-dashed border-gray-200 rounded-3xl p-8 text-center hover:border-orange-300 transition-all relative">
+                    {headerConfig.imageUrl ? (
+                      <div className="space-y-4">
+                        <img src={headerConfig.imageUrl} className="max-h-32 mx-auto rounded-lg shadow-md" alt="Preview Kop" />
+                        <button 
+                          onClick={() => saveHeaderConfig({ ...headerConfig, imageUrl: undefined })}
+                          className="text-rose-500 text-[10px] font-black uppercase flex items-center gap-2 mx-auto hover:text-rose-600"
+                        >
+                          <Trash2 size={14} /> Hapus Gambar
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="cursor-pointer block">
+                        <Upload className="mx-auto text-gray-300 mb-2" size={32} />
+                        <span className="text-[10px] font-black text-gray-400 uppercase">Klik untuk Unggah Kop (PNG/JPG)</span>
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          accept="image/*" 
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                saveHeaderConfig({ ...headerConfig, imageUrl: reader.result as string });
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                  <p className="text-[9px] text-gray-400 font-bold uppercase text-center italic">Disarankan menggunakan gambar dengan lebar minimal 1000px untuk hasil cetak tajam.</p>
+                </div>
+              )}
+
+              {headerConfig.type === 'template' && (
+                <div className="space-y-6 animate-in slide-in-from-bottom-4 bg-gray-50 p-8 rounded-[2rem]">
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-500 uppercase ml-1">Nama Instansi/Sekolah</label>
+                      <input 
+                        type="text" 
+                        value={headerConfig.templateData?.schoolName || ''}
+                        onChange={(e) => saveHeaderConfig({ ...headerConfig, templateData: { ...headerConfig.templateData!, schoolName: e.target.value } })}
+                        placeholder="Contoh: SMA NEGERI 1 JAKARTA"
+                        className="w-full px-5 py-3 rounded-2xl border border-gray-200 focus:border-orange-500 outline-none text-sm font-bold"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-500 uppercase ml-1">Telepon/Kontak</label>
+                      <input 
+                        type="text" 
+                        value={headerConfig.templateData?.phone || ''}
+                        onChange={(e) => saveHeaderConfig({ ...headerConfig, templateData: { ...headerConfig.templateData!, phone: e.target.value } })}
+                        placeholder="021-xxxxxxx"
+                        className="w-full px-5 py-3 rounded-2xl border border-gray-200 focus:border-orange-500 outline-none text-sm font-bold"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-500 uppercase ml-1">Alamat Lengkap</label>
+                    <textarea 
+                      value={headerConfig.templateData?.address || ''}
+                      onChange={(e) => saveHeaderConfig({ ...headerConfig, templateData: { ...headerConfig.templateData!, address: e.target.value } })}
+                      placeholder="Jl. Pendidikan No. 123, Kota..."
+                      className="w-full px-5 py-3 rounded-2xl border border-gray-200 focus:border-orange-500 outline-none text-sm font-bold h-24 resize-none"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-500 uppercase ml-1">Email</label>
+                      <input 
+                        type="text" 
+                        value={headerConfig.templateData?.email || ''}
+                        onChange={(e) => saveHeaderConfig({ ...headerConfig, templateData: { ...headerConfig.templateData!, email: e.target.value } })}
+                        placeholder="info@sekolah.sch.id"
+                        className="w-full px-5 py-3 rounded-2xl border border-gray-200 focus:border-orange-500 outline-none text-sm font-bold"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-500 uppercase ml-1">Website</label>
+                      <input 
+                        type="text" 
+                        value={headerConfig.templateData?.website || ''}
+                        onChange={(e) => saveHeaderConfig({ ...headerConfig, templateData: { ...headerConfig.templateData!, website: e.target.value } })}
+                        placeholder="www.sekolah.sch.id"
+                        className="w-full px-5 py-3 rounded-2xl border border-gray-200 focus:border-orange-500 outline-none text-sm font-bold"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-500 uppercase ml-1">Logo Instansi (Opsional)</label>
+                    <div className="flex items-center gap-4">
+                      {headerConfig.templateData?.logoUrl ? (
+                        <div className="relative group">
+                          <img src={headerConfig.templateData.logoUrl} className="w-16 h-16 rounded-xl object-contain border border-gray-200 bg-white p-1" alt="Logo" />
+                          <button 
+                            onClick={() => saveHeaderConfig({ ...headerConfig, templateData: { ...headerConfig.templateData!, logoUrl: undefined } })}
+                            className="absolute -top-2 -right-2 bg-rose-500 text-white w-6 h-6 rounded-full flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                          >✕</button>
+                        </div>
+                      ) : (
+                        <label className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-orange-400 transition-all bg-white">
+                          <ImageIcon size={20} className="text-gray-300" />
+                          <input 
+                            type="file" 
+                            className="hidden" 
+                            accept="image/*" 
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  saveHeaderConfig({ ...headerConfig, templateData: { ...headerConfig.templateData || { schoolName: '', address: '' }, logoUrl: reader.result as string } });
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                        </label>
+                      )}
+                      <div className="text-[9px] text-gray-400 font-bold uppercase">Logo akan diletakkan di sebelah kiri teks Kop.</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="p-8 bg-gray-50 border-t border-gray-100 flex justify-end">
+              <button 
+                onClick={() => setIsHeaderSettingsOpen(false)}
+                className="px-10 py-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black shadow-xl hover:bg-orange-600 transition-all uppercase tracking-widest"
+              >Simpan & Tutup</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style dangerouslySetInnerHTML={{ __html: `
         @media screen {
             .print-container {
