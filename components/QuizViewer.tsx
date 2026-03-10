@@ -239,8 +239,8 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
             </div>
           ) : headerConfig.type === 'template' && headerConfig.templateData ? (
             <div className="flex items-center gap-6 mb-8 border-b-[3.5px] border-black pb-6">
-              {headerConfig.templateData.logoUrl && (
-                <img src={headerConfig.templateData.logoUrl} className="w-24 h-24 object-contain" alt="Logo Instansi" />
+              {headerConfig.templateData.logoLeftUrl && (
+                <img src={headerConfig.templateData.logoLeftUrl} className="w-24 h-24 object-contain" alt="Logo Kiri" />
               )}
               <div className="flex-1 text-center">
                 <h1 className="text-xl font-black uppercase leading-tight mb-1">{headerConfig.templateData.schoolName}</h1>
@@ -251,6 +251,9 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
                   {headerConfig.templateData.website && <span>Web: {headerConfig.templateData.website}</span>}
                 </div>
               </div>
+              {headerConfig.templateData.logoRightUrl && (
+                <img src={headerConfig.templateData.logoRightUrl} className="w-24 h-24 object-contain" alt="Logo Kanan" />
+              )}
             </div>
           ) : (
              <div className="text-center mb-10 border-b-[3.5px] border-black pb-4">
@@ -535,38 +538,75 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-500 uppercase ml-1">Logo Instansi (Opsional)</label>
-                    <div className="flex items-center gap-4">
-                      {headerConfig.templateData?.logoUrl ? (
-                        <div className="relative group">
-                          <img src={headerConfig.templateData.logoUrl} className="w-16 h-16 rounded-xl object-contain border border-gray-200 bg-white p-1" alt="Logo" />
-                          <button 
-                            onClick={() => saveHeaderConfig({ ...headerConfig, templateData: { ...headerConfig.templateData!, logoUrl: undefined } })}
-                            className="absolute -top-2 -right-2 bg-rose-500 text-white w-6 h-6 rounded-full flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
-                          >✕</button>
-                        </div>
-                      ) : (
-                        <label className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-orange-400 transition-all bg-white">
-                          <ImageIcon size={20} className="text-gray-300" />
-                          <input 
-                            type="file" 
-                            className="hidden" 
-                            accept="image/*" 
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  saveHeaderConfig({ ...headerConfig, templateData: { ...headerConfig.templateData || { schoolName: '', address: '' }, logoUrl: reader.result as string } });
-                                };
-                                reader.readAsDataURL(file);
-                              }
-                            }}
-                          />
-                        </label>
-                      )}
-                      <div className="text-[9px] text-gray-400 font-bold uppercase">Logo akan diletakkan di sebelah kiri teks Kop.</div>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-500 uppercase ml-1">Logo Instansi (Kiri)</label>
+                      <div className="flex items-center gap-4">
+                        {headerConfig.templateData?.logoLeftUrl ? (
+                          <div className="relative group">
+                            <img src={headerConfig.templateData.logoLeftUrl} className="w-16 h-16 rounded-xl object-contain border border-gray-200 bg-white p-1" alt="Logo Kiri" />
+                            <button 
+                              onClick={() => saveHeaderConfig({ ...headerConfig, templateData: { ...headerConfig.templateData!, logoLeftUrl: undefined } })}
+                              className="absolute -top-2 -right-2 bg-rose-500 text-white w-6 h-6 rounded-full flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                            >✕</button>
+                          </div>
+                        ) : (
+                          <label className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-orange-400 transition-all bg-white">
+                            <ImageIcon size={20} className="text-gray-300" />
+                            <input 
+                              type="file" 
+                              className="hidden" 
+                              accept="image/*" 
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    saveHeaderConfig({ ...headerConfig, templateData: { ...headerConfig.templateData || { schoolName: '', address: '' }, logoLeftUrl: reader.result as string } });
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                          </label>
+                        )}
+                        <div className="text-[9px] text-gray-400 font-bold uppercase">Logo Dinas/Instansi.</div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-500 uppercase ml-1">Logo Sekolah (Kanan)</label>
+                      <div className="flex items-center gap-4">
+                        {headerConfig.templateData?.logoRightUrl ? (
+                          <div className="relative group">
+                            <img src={headerConfig.templateData.logoRightUrl} className="w-16 h-16 rounded-xl object-contain border border-gray-200 bg-white p-1" alt="Logo Kanan" />
+                            <button 
+                              onClick={() => saveHeaderConfig({ ...headerConfig, templateData: { ...headerConfig.templateData!, logoRightUrl: undefined } })}
+                              className="absolute -top-2 -right-2 bg-rose-500 text-white w-6 h-6 rounded-full flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                            >✕</button>
+                          </div>
+                        ) : (
+                          <label className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-orange-400 transition-all bg-white">
+                            <ImageIcon size={20} className="text-gray-300" />
+                            <input 
+                              type="file" 
+                              className="hidden" 
+                              accept="image/*" 
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    saveHeaderConfig({ ...headerConfig, templateData: { ...headerConfig.templateData || { schoolName: '', address: '' }, logoRightUrl: reader.result as string } });
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                          </label>
+                        )}
+                        <div className="text-[9px] text-gray-400 font-bold uppercase">Logo Sekolah/Unit.</div>
+                      </div>
                     </div>
                   </div>
                 </div>
