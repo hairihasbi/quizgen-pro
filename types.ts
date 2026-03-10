@@ -174,6 +174,7 @@ export interface HeaderConfig {
     phone?: string;
     email?: string;
     website?: string;
-    logoUrl?: string;
+    logoLeftUrl?: string;
+    logoRightUrl?: string;
   };
 }
