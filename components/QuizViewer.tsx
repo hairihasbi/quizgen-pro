@@ -14,6 +14,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
   const [showAnswer, setShowAnswer] = useState(false);
   const [exportMode, setExportMode] = useState<'soal' | 'kisi-kisi' | 'lengkap'>('soal');
   const [showGridAnswers, setShowGridAnswers] = useState(true);
+  const [isTwoColumn, setIsTwoColumn] = useState(false);
   const [isClientExporting, setIsClientExporting] = useState(false);
 
   useEffect(() => {
@@ -150,6 +151,20 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
                <label htmlFor="toggle-grid-answers" className="text-[10px] font-black text-orange-600 cursor-pointer uppercase">Tampil Kunci</label>
             </div>
           )}
+
+          {exportMode !== 'kisi-kisi' && (
+            <div className="flex items-center gap-2 bg-orange-50 px-4 py-2 rounded-2xl border border-orange-100">
+               <input 
+                 type="checkbox" 
+                 id="toggle-two-column"
+                 checked={isTwoColumn}
+                 onChange={(e) => setIsTwoColumn(e.target.checked)}
+                 className="w-4 h-4 accent-orange-500 cursor-pointer"
+               />
+               <label htmlFor="toggle-two-column" className="text-[10px] font-black text-orange-600 cursor-pointer uppercase">2 Kolom</label>
+            </div>
+          )}
+          
           {!hideDownload && (
             <div className="flex gap-2">
                <button onClick={() => window.print()} className="p-4 bg-gray-100 text-gray-600 rounded-2xl hover:bg-gray-200 transition-all"><Printer size={18} /></button>
@@ -179,7 +194,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
             </div>
           </div>
 
-          <div className="space-y-12">
+          <div className={`space-y-12 ${isTwoColumn && exportMode !== 'kisi-kisi' ? 'columns-2' : ''}`}>
             {exportMode === 'kisi-kisi' ? (
               <div className="animate-in fade-in">
                 <div className="text-center font-black text-sm uppercase mb-6 underline">MATRIKS KISI-KISI DAN KUNCI JAWABAN</div>
@@ -301,13 +316,24 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
             }
         }
         @media print {
-          .pdf-block { page-break-inside: avoid !important; }
+          .pdf-block { break-inside: avoid !important; }
           img { max-width: 100% !important; height: auto !important; display: block !important; }
         }
         .print-container {
           box-sizing: border-box;
           font-family: 'Plus Jakarta Sans', sans-serif !important;
           background: white !important;
+        }
+        .columns-2 {
+          column-count: 2;
+          column-gap: 12mm;
+          column-fill: auto;
+        }
+        .columns-2 > * {
+          break-inside: avoid;
+          display: block;
+          width: 100%;
+          margin-bottom: 8mm;
         }
       `}} />
     </div>
