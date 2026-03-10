@@ -17,6 +17,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
   const [isTwoColumn, setIsTwoColumn] = useState(false);
   const [isClientExporting, setIsClientExporting] = useState(false);
   const [isHeaderSettingsOpen, setIsHeaderSettingsOpen] = useState(false);
+  const [showIdentity, setShowIdentity] = useState(true);
   const [headerConfig, setHeaderConfig] = useState<HeaderConfig>({ type: 'default' });
 
   useEffect(() => {
@@ -183,6 +184,19 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
             </div>
           )}
 
+          {exportMode !== 'kisi-kisi' && (
+            <div className="flex items-center gap-2 bg-orange-50 px-4 py-2 rounded-2xl border border-orange-100">
+               <input 
+                 type="checkbox" 
+                 id="toggle-identity"
+                 checked={showIdentity}
+                 onChange={(e) => setShowIdentity(e.target.checked)}
+                 className="w-4 h-4 accent-orange-500 cursor-pointer"
+               />
+               <label htmlFor="toggle-identity" className="text-[10px] font-black text-orange-600 cursor-pointer uppercase">Identitas</label>
+            </div>
+          )}
+
           <button 
             onClick={() => setIsHeaderSettingsOpen(true)}
             className="flex items-center gap-2 bg-orange-50 px-4 py-2 rounded-2xl border border-orange-100 text-[10px] font-black text-orange-600 hover:bg-orange-100 transition-all uppercase"
@@ -245,6 +259,34 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
               <div className="flex justify-between items-end mt-4 px-2">
                   <div className="text-left text-[9pt] font-bold uppercase italic">Evaluasi Hasil Belajar</div>
                   <div className="text-right text-[9pt] font-black border-2 border-black px-4 py-1 uppercase tracking-widest">UTAMA</div>
+              </div>
+            </div>
+          )}
+
+          {/* BAGIAN IDENTITAS MURID */}
+          {showIdentity && exportMode !== 'kisi-kisi' && (
+            <div className="mb-10 border-b-[2px] border-black pb-6">
+              <div className="grid grid-cols-2 gap-x-16 gap-y-4">
+                <div className="flex items-end gap-3">
+                  <span className="text-[10pt] font-bold w-28 shrink-0">Nama Murid</span>
+                  <span className="text-[10pt] font-bold">:</span>
+                  <div className="flex-1 border-b border-dotted border-black h-5"></div>
+                </div>
+                <div className="flex items-end gap-3">
+                  <span className="text-[10pt] font-bold w-28 shrink-0">Mata Pelajaran</span>
+                  <span className="text-[10pt] font-bold">:</span>
+                  <div className="flex-1 border-b border-dotted border-black h-5 text-[10pt] font-bold px-1">{quiz.subject}</div>
+                </div>
+                <div className="flex items-end gap-3">
+                  <span className="text-[10pt] font-bold w-28 shrink-0">Kelas</span>
+                  <span className="text-[10pt] font-bold">:</span>
+                  <div className="flex-1 border-b border-dotted border-black h-5 text-[10pt] font-bold px-1">{quiz.grade}</div>
+                </div>
+                <div className="flex items-end gap-3">
+                  <span className="text-[10pt] font-bold w-28 shrink-0">Hari/ Tanggal</span>
+                  <span className="text-[10pt] font-bold">:</span>
+                  <div className="flex-1 border-b border-dotted border-black h-5"></div>
+                </div>
               </div>
             </div>
           )}
