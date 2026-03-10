@@ -164,3 +164,16 @@ export interface PaymentSettings {
   callbackUrl: string;
   packages: PaymentPackage[];
 }
+
+export interface HeaderConfig {
+  type: 'default' | 'image' | 'template';
+  imageUrl?: string;
+  templateData?: {
+    schoolName: string;
+    address: string;
+    phone?: string;
+    email?: string;
+    website?: string;
+    logoUrl?: string;
+  };
+}
