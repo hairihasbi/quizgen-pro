@@ -12,7 +12,7 @@ interface QuizViewerProps {
 
 const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = false }) => {
   const [showAnswer, setShowAnswer] = useState(false);
-  const [exportMode, setExportMode] = useState<'soal' | 'kisi-kisi' | 'lengkap'>('soal');
+  const [exportMode, setExportMode] = useState<'soal' | 'kisi-kisi' | 'lengkap' | 'kunci'>('soal');
   const [showGridAnswers, setShowGridAnswers] = useState(true);
   const [isTwoColumn, setIsTwoColumn] = useState(false);
   const [isClientExporting, setIsClientExporting] = useState(false);
@@ -156,6 +156,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
              <button onClick={() => { setExportMode('soal'); setShowAnswer(false); }} className={`px-5 py-2.5 rounded-xl text-[10px] font-black transition-all ${exportMode === 'soal' ? 'bg-white text-orange-600 shadow-md' : 'text-orange-300 hover:text-orange-400'}`}>NASKAH</button>
              <button onClick={() => { setExportMode('kisi-kisi'); setShowAnswer(false); }} className={`px-5 py-2.5 rounded-xl text-[10px] font-black transition-all ${exportMode === 'kisi-kisi' ? 'bg-white text-orange-600 shadow-md' : 'text-orange-300 hover:text-orange-400'}`}>KISI-KISI</button>
              <button onClick={() => { setExportMode('lengkap'); setShowAnswer(true); }} className={`px-5 py-2.5 rounded-xl text-[10px] font-black transition-all ${exportMode === 'lengkap' ? 'bg-white text-orange-600 shadow-md' : 'text-orange-300 hover:text-orange-400'}`}>PEMBAHASAN</button>
+             <button onClick={() => { setExportMode('kunci'); setShowAnswer(true); }} className={`px-5 py-2.5 rounded-xl text-[10px] font-black transition-all ${exportMode === 'kunci' ? 'bg-white text-orange-600 shadow-md' : 'text-orange-300 hover:text-orange-400'}`}>KUNCI SAJA</button>
           </div>
 
           {exportMode === 'kisi-kisi' && (
@@ -294,7 +295,7 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
             </div>
           )}
 
-          <div className={`space-y-12 ${isTwoColumn && exportMode !== 'kisi-kisi' ? 'columns-2' : ''}`}>
+          <div className={`space-y-12 ${isTwoColumn && exportMode !== 'kisi-kisi' && exportMode !== 'kunci' ? 'columns-2' : ''}`}>
             {exportMode === 'kisi-kisi' ? (
               <div className="animate-in fade-in">
                 <div className="text-center font-black text-sm uppercase mb-6 underline">MATRIKS KISI-KISI DAN KUNCI JAWABAN</div>
@@ -326,6 +327,41 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ quiz, onClose, hideDownload = f
                       ))}
                    </tbody>
                 </table>
+              </div>
+            ) : exportMode === 'kunci' ? (
+              <div className="animate-in fade-in">
+                <div className="text-center font-black text-sm uppercase mb-8 underline tracking-widest">KUNCI JAWABAN EVALUASI HASIL BELAJAR</div>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-x-8 gap-y-4">
+                  {sortedQuestions.map((q, i) => (
+                    <div key={q.id} className="flex items-center gap-3 border-b border-gray-100 pb-2">
+                      <div className="w-8 h-8 bg-black text-white rounded-lg flex items-center justify-center font-black text-[10pt] shrink-0">{i+1}</div>
+                      <div className="font-black text-orange-600 text-[11pt] uppercase tracking-tighter">
+                        {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Bagian Essay/Uraian jika ada */}
+                {sortedQuestions.some(q => q.type === 'Uraian/Essay') && (
+                  <div className="mt-12 pt-8 border-t-2 border-black">
+                    <div className="font-black text-xs uppercase mb-6 tracking-widest bg-black text-white inline-block px-4 py-1">Kunci Jawaban Uraian</div>
+                    <div className="space-y-6">
+                      {sortedQuestions.filter(q => q.type === 'Uraian/Essay').map((q, i) => (
+                        <div key={q.id} className="pdf-block">
+                          <div className="flex gap-4">
+                            <div className="font-black text-[11pt] w-7 shrink-0 text-right">{sortedQuestions.indexOf(q) + 1}.</div>
+                            <div className="flex-1">
+                              <div className="text-[10pt] font-bold leading-relaxed bg-orange-50/50 p-4 rounded-xl border border-orange-100">
+                                {q.answer}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               sortedQuestions.map((q, i) => {
