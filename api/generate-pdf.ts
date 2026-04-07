@@ -8,6 +8,7 @@ export default async function handler(req: any, res: any) {
   const { quiz, showAnswer, mode } = req.body;
   if (!quiz) return res.status(400).send('Quiz data missing');
   const isKisiKisi = mode === 'kisi-kisi';
+  const isKunci = mode === 'kunci';
 
   try {
     const browser = await puppeteer.launch({
@@ -81,6 +82,10 @@ export default async function handler(req: any, res: any) {
         .kisi-table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
         .kisi-table th, .kisi-table td { border: 1px solid black; padding: 6px; vertical-align: top; }
         .kisi-table th { background: #eeeeee; font-weight: 800; text-align: center; }
+        .kunci-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 20px; }
+        .kunci-item { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #eee; padding-bottom: 5px; font-size: 10pt; }
+        .kunci-num { background: black; color: white; width: 22px; height: 22px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 9pt; }
+        .kunci-val { font-weight: 800; color: #c2410c; }
         .footer { margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px; font-size: 7pt; color: #999; display: flex; justify-content: space-between; font-style: italic; }
       </style>
     </head>
@@ -92,16 +97,31 @@ export default async function handler(req: any, res: any) {
         </div>
         <div class="header-line"></div>
 
-        ${!isKisiKisi ? `
-          <table class="student-id">
-            <tr>
-              <td width="15%">Nama Siswa</td><td width="2%">:</td><td style="border-bottom: 1px dotted #ccc;"></td>
-              <td width="15%" align="right">Hari / Tanggal</td><td width="2%">:</td><td width="20%" style="border-bottom: 1px dotted #ccc;"></td>
-            </tr>
-          </table>
-        ` : ''}
-
-        ${isKisiKisi ? `
+        ${isKunci ? `
+          <div style="text-align:center; text-decoration:underline; font-weight:800; font-family:'Plus Jakarta Sans'; margin-bottom:20px;">KUNCI JAWABAN EVALUASI HASIL BELAJAR</div>
+          <div class="kunci-grid">
+            ${sortedQuestions.map((q: any, i: number) => `
+              <div class="kunci-item">
+                <div class="kunci-num">${i + 1}</div>
+                <div class="kunci-val">${Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</div>
+              </div>
+            `).join('')}
+          </div>
+          
+          ${sortedQuestions.some((q: any) => q.type === 'Uraian/Essay') ? `
+            <div style="margin-top:40px; border-top:2px solid black; padding-top:20px;">
+              <div style="background:black; color:white; display:inline-block; padding:4px 15px; font-weight:800; font-size:9pt; text-transform:uppercase; margin-bottom:15px;">Kunci Jawaban Uraian</div>
+              ${sortedQuestions.filter((q: any) => q.type === 'Uraian/Essay').map((q: any) => `
+                <div style="margin-bottom:15px; page-break-inside:avoid;">
+                  <div style="display:flex; gap:10px;">
+                    <div style="font-weight:800; min-width:25px; text-align:right;">${sortedQuestions.indexOf(q) + 1}.</div>
+                    <div style="flex:1; background:#fff7ed; border:1px solid #ffedd5; padding:10px; font-size:10pt; font-weight:700;">${q.answer}</div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
+        ` : isKisiKisi ? `
           <div style="text-align:center; text-decoration:underline; font-weight:800; font-family:'Plus Jakarta Sans'; margin-bottom:20px;">MATRIKS KISI-KISI SOAL</div>
           <table class="kisi-table">
             <thead>
@@ -130,6 +150,12 @@ export default async function handler(req: any, res: any) {
             </tbody>
           </table>
         ` : `
+          <table class="student-id">
+            <tr>
+              <td width="15%">Nama Siswa</td><td width="2%">:</td><td style="border-bottom: 1px dotted #ccc;"></td>
+              <td width="15%" align="right">Hari / Tanggal</td><td width="2%">:</td><td width="20%" style="border-bottom: 1px dotted #ccc;"></td>
+            </tr>
+          </table>
           ${Object.entries(grouped).map(([type, questions], gIdx) => `
             <div class="type-header">${String.fromCharCode(65 + gIdx)}. ${type}</div>
             ${questions.map((q: any, idx: number) => {
