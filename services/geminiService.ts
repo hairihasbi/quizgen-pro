@@ -22,6 +22,45 @@ export class GeminiService {
     }
   }
 
+  // Helper to clean up invalid or deprecated model names
+  private static sanitizeModelName(modelName: string, isExternal: boolean): string {
+    if (!modelName) {
+      return isExternal ? 'gpt-4o-mini' : 'gemini-2.5-flash';
+    }
+    let clean = modelName.trim();
+    if (clean.includes('gemini-3')) {
+      clean = clean.replace(/gemini-3-flash-preview|gemini-3-pro-preview|gemini-3-[a-z0-9-]+/gi, isExternal ? 'gpt-4o-mini' : 'gemini-2.5-flash');
+    }
+    return clean;
+  }
+
+  // Native Gemini Key: only process.env or customApiKey when provider === 'native'
+  private static getNativeGeminiKey(aiSettings: any): string {
+    if (aiSettings.provider === 'native' && aiSettings.customApiKey) {
+      return aiSettings.customApiKey;
+    }
+    return process.env.API_KEY || process.env.GEMINI_API_KEY || '';
+  }
+
+  // Primary External Key (LiteLLM / OpenAI):
+  private static getExternalPrimaryKey(aiSettings: any): string {
+    if (aiSettings.provider === 'external' && aiSettings.customApiKey) {
+      return aiSettings.customApiKey;
+    }
+    return process.env.OPENAI_API_KEY || process.env.LITELLM_API_KEY || '';
+  }
+
+  // Fallback External Key (LiteLLM / OpenAI):
+  private static getExternalFallbackKey(aiSettings: any): string {
+    if (aiSettings.fallbackApiKey) {
+      return aiSettings.fallbackApiKey;
+    }
+    if (aiSettings.provider === 'external' && aiSettings.customApiKey) {
+      return aiSettings.customApiKey;
+    }
+    return process.env.OPENAI_API_KEY || process.env.LITELLM_API_KEY || '';
+  }
+
   private static getSystemInstruction(params: any): string {
     const { subject, literacyMode, questionsPerPassage, optionCount, cognitiveLevels } = params;
     const isEksakta = /matematika|fisika|kimia|ipa|sains/i.test(subject);
@@ -88,8 +127,10 @@ export class GeminiService {
       headers['Authorization'] = `Bearer ${apiKey}`;
     }
 
+    const cleanModel = GeminiService.sanitizeModelName(model, true);
+
     const body: any = {
-      model: model || 'gpt-4o-mini',
+      model: cleanModel,
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: prompt }
@@ -103,19 +144,36 @@ export class GeminiService {
       body: JSON.stringify(body)
     });
 
-    // If 400 Bad Request occurs (some LiteLLM proxies or older model backends don't accept response_format), retry without it
+    // Handle Bad Request (e.g. LiteLLM proxy response_format or model group errors)
     if (!response.ok && response.status === 400) {
+      const errText = await response.clone().text().catch(() => '');
+      console.warn(`[LITELLM_400_WARN] First attempt failed (${cleanModel}): ${errText}`);
+
+      // Try retry 1: without response_format
       delete body.response_format;
       response = await fetch(endpoint, {
         method: 'POST',
         headers,
         body: JSON.stringify(body)
       });
+
+      // Try retry 2: if model group rejected (e.g. no healthy deployments for gemini-3-*), switch to standard model
+      if (!response.ok && (errText.includes('no healthy deployments') || errText.includes('Model Group') || errText.includes('model'))) {
+        const altModel = 'gpt-4o-mini';
+        console.warn(`[LITELLM_RETRY_MODEL] Retrying LiteLLM with fallback model name (${altModel})...`);
+        body.model = altModel;
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body)
+        });
+      }
     }
 
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.error?.message || errData.message || `HTTP ${response.status}`);
+      const msg = errData.error?.message || errData.message || `HTTP ${response.status}`;
+      throw new Error(`LiteLLM/OpenAI (${body.model}): ${msg}`);
     }
 
     const data = await response.json();
@@ -135,24 +193,33 @@ export class GeminiService {
     prompt: string
   ): Promise<any> {
     if (!apiKey) {
-      throw new Error("Google Gemini API Key tidak ditemukan.");
+      throw new Error("Google Gemini API Key belum dikonfigurasi di server atau Pengaturan.");
     }
 
+    const cleanModel = GeminiService.sanitizeModelName(modelId, false);
     const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: modelId || 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        systemInstruction: system,
-        responseMimeType: "application/json"
+
+    try {
+      const response = await ai.models.generateContent({
+        model: cleanModel,
+        contents: prompt,
+        config: {
+          systemInstruction: system,
+          responseMimeType: "application/json"
+        }
+      });
+
+      if (!response.text) {
+        throw new Error("Model Gemini tidak mengembalikan respon teks.");
       }
-    });
 
-    if (!response.text) {
-      throw new Error("Model Gemini tidak mengembalikan respon teks.");
+      return GeminiService.extractJson(response.text);
+    } catch (e: any) {
+      if (e.message?.includes('API_KEY_INVALID') || e.message?.includes('API key not valid')) {
+        throw new Error(`Google Gemini API Key tidak valid. Mohon periksa API Key Google di Pengaturan.`);
+      }
+      throw e;
     }
-
-    return GeminiService.extractJson(response.text);
   }
 
   async generateQuiz(params: any): Promise<any> {
@@ -166,14 +233,14 @@ export class GeminiService {
     TINGKAT KESULITAN: ${params.difficulty}.
     VARIAN LEVEL: ${params.cognitiveLevels.join(', ')}.`;
 
-    const nativeApiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || aiSettings.customApiKey || '';
-    const primaryGeminiModel = params.model || aiSettings.targetModel || 'gemini-2.5-flash';
+    const nativeApiKey = GeminiService.getNativeGeminiKey(aiSettings);
+    const primaryGeminiModel = GeminiService.sanitizeModelName(params.model || aiSettings.targetModel, false);
 
     if (isExternalPrimary) {
-      // Primary: LiteLLM / OpenAI
+      // Primary Engine: LiteLLM / OpenAI
       const primaryBaseUrl = aiSettings.baseUrl || process.env.LITELLM_BASE_URL || 'https://api.openai.com/v1';
-      const primaryApiKey = aiSettings.customApiKey || process.env.OPENAI_API_KEY || process.env.LITELLM_API_KEY || nativeApiKey || '';
-      const model = aiSettings.targetModel || 'gpt-4o-mini';
+      const primaryApiKey = GeminiService.getExternalPrimaryKey(aiSettings);
+      const model = GeminiService.sanitizeModelName(aiSettings.targetModel || params.model, true);
 
       try {
         console.log(`[AI_ENGINE] Menggunakan Primary External Engine (${model} @ ${primaryBaseUrl})...`);
@@ -190,21 +257,21 @@ export class GeminiService {
             throw new Error(`External Engine Gagal (${primaryErr.message}) & Fallback Gemini Native Gagal (${fallbackErr.message})`);
           }
         } else {
-          throw new Error(`External Engine Gagal (${model}): ${primaryErr.message}`);
+          throw new Error(`External Engine Gagal (${primaryErr.message}). (Catatan: Fallback Native Gemini tidak memiliki API Key valid)`);
         }
       }
     } else {
-      // Primary: Native Gemini
+      // Primary Engine: Native Gemini
       try {
         console.log(`[AI_ENGINE] Menggunakan Primary Native Gemini Engine (${primaryGeminiModel})...`);
         return await GeminiService.callNativeGemini(nativeApiKey, primaryGeminiModel, system, prompt);
       } catch (primaryErr: any) {
         console.warn(`[AI_ENGINE_WARNING] Primary Gemini Error: ${primaryErr.message}`);
 
-        // Check if Fallback OpenAI / LiteLLM is configured
+        // Try Fallback to OpenAI / LiteLLM
         const fallbackBaseUrl = aiSettings.fallbackBaseUrl || aiSettings.baseUrl || process.env.LITELLM_BASE_URL || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
-        const fallbackApiKey = aiSettings.fallbackApiKey || aiSettings.customApiKey || process.env.OPENAI_API_KEY || process.env.LITELLM_API_KEY || '';
-        const fallbackModel = aiSettings.fallbackModel || 'gpt-4o-mini';
+        const fallbackApiKey = GeminiService.getExternalFallbackKey(aiSettings);
+        const fallbackModel = GeminiService.sanitizeModelName(aiSettings.fallbackModel || 'gpt-4o-mini', true);
         const isFallbackEnabled = aiSettings.enableFallback !== false;
 
         if (isFallbackEnabled && (fallbackApiKey || process.env.OPENAI_API_KEY || process.env.LITELLM_API_KEY)) {
@@ -215,7 +282,7 @@ export class GeminiService {
             throw new Error(`Gemini Primary Gagal (${primaryErr.message}) & Fallback OpenAI/LiteLLM Gagal (${fallbackErr.message})`);
           }
         } else {
-          throw new Error(`Gemini Engine Gagal (${primaryGeminiModel}): ${primaryErr.message}. (Tips: Konfigurasi Fallback OpenAI/LiteLLM di Pengaturan Situs agar otomatis dialihkan)`);
+          throw new Error(`Gemini Engine Gagal (${primaryErr.message}). ${isFallbackEnabled ? '(Tips: Masukkan Fallback API Key OpenAI/LiteLLM di Pengaturan Situs agar otomatis beralih)' : ''}`);
         }
       }
     }
@@ -223,26 +290,13 @@ export class GeminiService {
 
   async generateVisual(prompt: string): Promise<string> {
     const aiSettings = await StorageService.getAISettings();
-    const isExternal = aiSettings.provider === 'external';
-    
-    let apiKey = isExternal ? aiSettings.customApiKey : (process.env.API_KEY || process.env.GEMINI_API_KEY);
-    if (isExternal && !apiKey) {
-        apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
-    }
-
-    let modelId = 'gemini-3-pro-image-preview';
-    if (isExternal && aiSettings.targetImageModel) {
-      modelId = aiSettings.targetImageModel;
-    }
-
+    const apiKey = GeminiService.getNativeGeminiKey(aiSettings);
     if (!apiKey) return "";
 
-    // Visual generation biasanya spesifik Gemini, tetap gunakan SDK jika memungkinkan
-    // Namun jika eksternal, kita asumsikan baseUrl mungkin tidak mendukung generateContent standar
-    // Untuk saat ini, visual tetap menggunakan SDK Gemini karena format outputnya unik
-    const ai = new GoogleGenAI({ apiKey } as any);
+    const modelId = 'gemini-2.5-flash';
 
     try {
+      const ai = new GoogleGenAI({ apiKey } as any);
       const response = await ai.models.generateContent({
         model: modelId,
         contents: { parts: [{ text: `A clean, high-contrast educational illustration for classroom test. Black and white or simple colors. Minimalist style. Content: ${prompt}` }] },

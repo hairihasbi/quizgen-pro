@@ -174,6 +174,13 @@ export const StorageService = {
     if (!local) return defaults;
     try {
       const parsed = JSON.parse(local);
+      // Clean up legacy/outdated model names
+      if (parsed.targetModel && (parsed.targetModel.includes('gemini-3') || parsed.targetModel.includes('preview'))) {
+        parsed.targetModel = 'gemini-2.5-flash';
+      }
+      if (parsed.fallbackModel && (parsed.fallbackModel.includes('gemini-3') || parsed.fallbackModel.includes('preview'))) {
+        parsed.fallbackModel = 'gpt-4o-mini';
+      }
       return { ...defaults, ...parsed };
     } catch (e) {
       return defaults;
