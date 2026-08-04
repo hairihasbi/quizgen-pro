@@ -161,7 +161,23 @@ export const StorageService = {
   },
   getAISettings: async (): Promise<AISettings> => {
     const local = localStorage.getItem('quizgen_ai_settings');
-    return local ? JSON.parse(local) : { provider: 'native', baseUrl: '', customApiKey: '', targetModel: 'gemini-3-pro-preview' };
+    const defaults: AISettings = { 
+      provider: 'native', 
+      baseUrl: '', 
+      customApiKey: '', 
+      targetModel: 'gemini-2.5-flash',
+      enableFallback: true,
+      fallbackBaseUrl: 'https://api.openai.com/v1',
+      fallbackApiKey: '',
+      fallbackModel: 'gpt-4o-mini'
+    };
+    if (!local) return defaults;
+    try {
+      const parsed = JSON.parse(local);
+      return { ...defaults, ...parsed };
+    } catch (e) {
+      return defaults;
+    }
   },
   saveAISettings: async (settings: AISettings) => {
     localStorage.setItem('quizgen_ai_settings', JSON.stringify(settings));

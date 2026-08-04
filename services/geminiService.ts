@@ -66,29 +66,98 @@ export class GeminiService {
     return instruction;
   }
 
+  // Method for calling OpenAI or LiteLLM endpoints (/chat/completions)
+  private static async callOpenAICompatible(
+    baseUrl: string,
+    apiKey: string,
+    model: string,
+    system: string,
+    prompt: string
+  ): Promise<any> {
+    if (!baseUrl) {
+      throw new Error("Base URL endpoint OpenAI/LiteLLM belum dikonfigurasi.");
+    }
+
+    const cleanBaseUrl = baseUrl.replace(/\/$/, '').replace(/\/chat\/completions$/, '');
+    const endpoint = `${cleanBaseUrl}/chat/completions`;
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    if (apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+
+    const body: any = {
+      model: model || 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: prompt }
+      ],
+      response_format: { type: 'json_object' }
+    };
+
+    let response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body)
+    });
+
+    // If 400 Bad Request occurs (some LiteLLM proxies or older model backends don't accept response_format), retry without it
+    if (!response.ok && response.status === 400) {
+      delete body.response_format;
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body)
+      });
+    }
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error?.message || errData.message || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new Error("Response OpenAI/LiteLLM tidak berisi konten.");
+    }
+
+    return GeminiService.extractJson(content);
+  }
+
+  // Method for calling Native Gemini SDK
+  private static async callNativeGemini(
+    apiKey: string,
+    modelId: string,
+    system: string,
+    prompt: string
+  ): Promise<any> {
+    if (!apiKey) {
+      throw new Error("Google Gemini API Key tidak ditemukan.");
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: modelId || 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        systemInstruction: system,
+        responseMimeType: "application/json"
+      }
+    });
+
+    if (!response.text) {
+      throw new Error("Model Gemini tidak mengembalikan respon teks.");
+    }
+
+    return GeminiService.extractJson(response.text);
+  }
+
   async generateQuiz(params: any): Promise<any> {
     const aiSettings = await StorageService.getAISettings();
-    const isExternal = aiSettings.provider === 'external';
-    
-    // Prioritas API Key: 
-    // 1. Custom Key dari Settings (jika mode eksternal)
-    // 2. API_KEY (Environment variable standar platform)
-    // 3. GEMINI_API_KEY (Environment variable alternatif)
-    let apiKey = isExternal ? aiSettings.customApiKey : (process.env.API_KEY || process.env.GEMINI_API_KEY);
-    
-    // Jika mode eksternal tapi key kosong, coba fallback ke env
-    if (isExternal && !apiKey) {
-      apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
-    }
-
-    let modelId = params.model || 'gemini-3-flash-preview';
-    if (isExternal && aiSettings.targetModel) {
-      modelId = aiSettings.targetModel;
-    }
-
-    if (!apiKey) {
-      throw new Error("API Key tidak ditemukan. Silakan konfigurasi di menu Pengaturan.");
-    }
+    const isExternalPrimary = aiSettings.provider === 'external';
 
     const system = GeminiService.getSystemInstruction(params);
     const prompt = `TUGAS: BUATKAN ${params.count} SOAL ${params.subject} TENTANG ${params.topic}.
@@ -97,59 +166,58 @@ export class GeminiService {
     TINGKAT KESULITAN: ${params.difficulty}.
     VARIAN LEVEL: ${params.cognitiveLevels.join(', ')}.`;
 
-    // Jika mode eksternal, gunakan fetch untuk kompatibilitas lebih luas (LiteLLM/OpenAI format)
-    if (isExternal && aiSettings.baseUrl) {
+    const nativeApiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || aiSettings.customApiKey || '';
+    const primaryGeminiModel = params.model || aiSettings.targetModel || 'gemini-2.5-flash';
+
+    if (isExternalPrimary) {
+      // Primary: LiteLLM / OpenAI
+      const primaryBaseUrl = aiSettings.baseUrl || process.env.LITELLM_BASE_URL || 'https://api.openai.com/v1';
+      const primaryApiKey = aiSettings.customApiKey || process.env.OPENAI_API_KEY || process.env.LITELLM_API_KEY || nativeApiKey || '';
+      const model = aiSettings.targetModel || 'gpt-4o-mini';
+
       try {
-        const response = await fetch(`${aiSettings.baseUrl.replace(/\/$/, '')}/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            model: modelId,
-            messages: [
-              { role: 'system', content: system },
-              { role: 'user', content: prompt }
-            ],
-            response_format: { type: 'json_object' }
-          })
-        });
+        console.log(`[AI_ENGINE] Menggunakan Primary External Engine (${model} @ ${primaryBaseUrl})...`);
+        return await GeminiService.callOpenAICompatible(primaryBaseUrl, primaryApiKey, model, system, prompt);
+      } catch (primaryErr: any) {
+        console.warn(`[AI_ENGINE_WARNING] Primary External Engine Error: ${primaryErr.message}`);
 
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.error?.message || `HTTP Error ${response.status}`);
+        // Try Fallback to Native Gemini
+        if (nativeApiKey) {
+          try {
+            console.log(`[AI_ENGINE] Mencoba Fallback ke Native Gemini Engine (${primaryGeminiModel})...`);
+            return await GeminiService.callNativeGemini(nativeApiKey, primaryGeminiModel, system, prompt);
+          } catch (fallbackErr: any) {
+            throw new Error(`External Engine Gagal (${primaryErr.message}) & Fallback Gemini Native Gagal (${fallbackErr.message})`);
+          }
+        } else {
+          throw new Error(`External Engine Gagal (${model}): ${primaryErr.message}`);
         }
-
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content;
-        return GeminiService.extractJson(content || "{}");
-      } catch (e: any) {
-        console.error("[EXTERNAL_AI_ERROR]", e);
-        throw new Error(`External Engine Gagal (${modelId}): ` + e.message);
       }
-    }
+    } else {
+      // Primary: Native Gemini
+      try {
+        console.log(`[AI_ENGINE] Menggunakan Primary Native Gemini Engine (${primaryGeminiModel})...`);
+        return await GeminiService.callNativeGemini(nativeApiKey, primaryGeminiModel, system, prompt);
+      } catch (primaryErr: any) {
+        console.warn(`[AI_ENGINE_WARNING] Primary Gemini Error: ${primaryErr.message}`);
 
-    // Mode Native Gemini
-    const ai = new GoogleGenAI({ apiKey });
-    try {
-      const response = await ai.models.generateContent({
-        model: modelId,
-        contents: prompt,
-        config: {
-          systemInstruction: system,
-          responseMimeType: "application/json"
+        // Check if Fallback OpenAI / LiteLLM is configured
+        const fallbackBaseUrl = aiSettings.fallbackBaseUrl || aiSettings.baseUrl || process.env.LITELLM_BASE_URL || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
+        const fallbackApiKey = aiSettings.fallbackApiKey || aiSettings.customApiKey || process.env.OPENAI_API_KEY || process.env.LITELLM_API_KEY || '';
+        const fallbackModel = aiSettings.fallbackModel || 'gpt-4o-mini';
+        const isFallbackEnabled = aiSettings.enableFallback !== false;
+
+        if (isFallbackEnabled && (fallbackApiKey || process.env.OPENAI_API_KEY || process.env.LITELLM_API_KEY)) {
+          try {
+            console.log(`[AI_ENGINE] Mencoba Fallback ke OpenAI/LiteLLM Engine (${fallbackModel} @ ${fallbackBaseUrl})...`);
+            return await GeminiService.callOpenAICompatible(fallbackBaseUrl, fallbackApiKey, fallbackModel, system, prompt);
+          } catch (fallbackErr: any) {
+            throw new Error(`Gemini Primary Gagal (${primaryErr.message}) & Fallback OpenAI/LiteLLM Gagal (${fallbackErr.message})`);
+          }
+        } else {
+          throw new Error(`Gemini Engine Gagal (${primaryGeminiModel}): ${primaryErr.message}. (Tips: Konfigurasi Fallback OpenAI/LiteLLM di Pengaturan Situs agar otomatis dialihkan)`);
         }
-      });
-      
-      if (!response.text) {
-        throw new Error("Model tidak mengembalikan teks.");
       }
-      
-      return GeminiService.extractJson(response.text);
-    } catch (e: any) {
-      console.error("[NATIVE_AI_ERROR]", e);
-      throw new Error(`Native Engine Gagal (${modelId}): ` + (e.message || "Unknown Error"));
     }
   }
 
