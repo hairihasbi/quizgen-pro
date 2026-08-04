@@ -73,6 +73,12 @@ export interface AISettings {
   customApiKey: string;
   targetModel: string;
   targetImageModel?: string; // New field for External Image Generator
+  
+  // Backup / Fallback AI Engine (OpenAI / LiteLLM)
+  enableFallback?: boolean;
+  fallbackBaseUrl?: string;
+  fallbackApiKey?: string;
+  fallbackModel?: string;
 }
 
 export interface AIProgressEvent {
