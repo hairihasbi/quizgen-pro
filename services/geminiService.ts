@@ -1,24 +1,59 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { Question, QuestionType } from "../types";
+import { Question, QuestionType, AISettings } from "../types";
 import { StorageService } from "./storageService";
 
 export class GeminiService {
   private static extractJson(text: string): any {
     try {
       let cleaned = text.trim();
-      if (cleaned.startsWith("```")) {
-        cleaned = cleaned.replace(/^```(json)?\s*/, "").replace(/\s*```$/, "");
+
+      // Check and extract codeblocks
+      const codeBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+      if (codeBlockMatch && codeBlockMatch[1]) {
+        cleaned = codeBlockMatch[1].trim();
+      } else if (cleaned.startsWith("```")) {
+        cleaned = cleaned.replace(/^```(json)?\s*/i, "").replace(/\s*```$/, "").trim();
       }
-      const startIdx = cleaned.indexOf('{');
-      const endIdx = cleaned.lastIndexOf('}');
-      if (startIdx !== -1 && endIdx !== -1) {
-        cleaned = cleaned.substring(startIdx, endIdx + 1);
+
+      const startObj = cleaned.indexOf('{');
+      const endObj = cleaned.lastIndexOf('}');
+      const startArr = cleaned.indexOf('[');
+      const endArr = cleaned.lastIndexOf(']');
+
+      let parsed: any = null;
+
+      if (startObj !== -1 && endObj !== -1 && (startArr === -1 || startObj < startArr)) {
+        const jsonStr = cleaned.substring(startObj, endObj + 1);
+        parsed = JSON.parse(jsonStr);
+      } else if (startArr !== -1 && endArr !== -1) {
+        const jsonStr = cleaned.substring(startArr, endArr + 1);
+        parsed = { questions: JSON.parse(jsonStr) };
+      } else {
+        parsed = JSON.parse(cleaned);
       }
-      return JSON.parse(cleaned);
-    } catch (e) {
-      console.error("[JSON_PARSE_ERROR]", e);
-      return { questions: [], tags: [], grid: "" };
+
+      // Normalize questions array from various potential keys
+      if (!parsed.questions) {
+        if (Array.isArray(parsed.soal)) parsed.questions = parsed.soal;
+        else if (Array.isArray(parsed.data)) parsed.questions = parsed.data;
+        else if (Array.isArray(parsed.quiz)) parsed.questions = parsed.quiz;
+        else if (Array.isArray(parsed.items)) parsed.questions = parsed.items;
+        else if (Array.isArray(parsed.results)) parsed.questions = parsed.results;
+        else if (Array.isArray(parsed)) parsed = { questions: parsed };
+        else parsed.questions = [];
+      }
+
+      // Sanitize questions
+      if (!Array.isArray(parsed.questions) || parsed.questions.length === 0) {
+        console.warn("[JSON_PARSE_WARN] No questions found in parsed JSON:", parsed);
+        throw new Error("AI berhasil merespons tetapi tidak ditemukan butir soal yang valid dalam format JSON.");
+      }
+
+      return parsed;
+    } catch (e: any) {
+      console.error("[JSON_PARSE_ERROR]", e, "RAW_TEXT:", text);
+      throw new Error(`Format JSON dari AI tidak valid: ${e.message}`);
     }
   }
 
@@ -34,8 +69,11 @@ export class GeminiService {
     return clean;
   }
 
-  // Native Gemini Key: only process.env or customApiKey when provider === 'native'
+  // Native Gemini Key: explicit geminiApiKey or provider customApiKey or process.env
   private static getNativeGeminiKey(aiSettings: any): string {
+    if (aiSettings.geminiApiKey) {
+      return aiSettings.geminiApiKey;
+    }
     if (aiSettings.provider === 'native' && aiSettings.customApiKey) {
       return aiSettings.customApiKey;
     }
@@ -138,11 +176,20 @@ export class GeminiService {
       response_format: { type: 'json_object' }
     };
 
-    let response = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body)
-    });
+    let response: Response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body)
+      });
+    } catch (fetchErr: any) {
+      const isFailedToFetch = fetchErr.message?.includes('fetch') || fetchErr.name === 'TypeError';
+      if (isFailedToFetch) {
+        throw new Error(`Gagal terhubung ke endpoint (${cleanBaseUrl}). Terjadi 'Failed to fetch'. Periksa: (1) Pastikan CORS aktif di server LiteLLM (misal CORS_ALLOWED_ORIGINS="*"), (2) Jika web ini di HTTPS, pastikan endpoint LiteLLM menggunakan HTTPS (browser memblokir HTTP/Mixed Content), (3) Pastikan LiteLLM online dan dapat diakses dari browser.`);
+      }
+      throw fetchErr;
+    }
 
     // Handle Bad Request (e.g. LiteLLM proxy response_format or model group errors)
     if (!response.ok && response.status === 400) {
@@ -151,35 +198,39 @@ export class GeminiService {
 
       // Try retry 1: without response_format
       delete body.response_format;
-      response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body)
-      });
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body)
+        });
+      } catch (e) {}
 
       // Try retry 2: if model group rejected (e.g. no healthy deployments for gemini-3-*), switch to standard model
       if (!response.ok && (errText.includes('no healthy deployments') || errText.includes('Model Group') || errText.includes('model'))) {
         const altModel = 'gpt-4o-mini';
         console.warn(`[LITELLM_RETRY_MODEL] Retrying LiteLLM with fallback model name (${altModel})...`);
         body.model = altModel;
-        response = await fetch(endpoint, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(body)
-        });
+        try {
+          response = await fetch(endpoint, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(body)
+          });
+        } catch (e) {}
       }
     }
 
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
-      const msg = errData.error?.message || errData.message || `HTTP ${response.status}`;
+      const msg = errData.error?.message || errData.message || `HTTP ${response.status} (${response.statusText})`;
       throw new Error(`LiteLLM/OpenAI (${body.model}): ${msg}`);
     }
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
     if (!content) {
-      throw new Error("Response OpenAI/LiteLLM tidak berisi konten.");
+      throw new Error("Response OpenAI/LiteLLM tidak berisi konten hasil (choices[0].message.content kosong).");
     }
 
     return GeminiService.extractJson(content);
@@ -193,7 +244,7 @@ export class GeminiService {
     prompt: string
   ): Promise<any> {
     if (!apiKey) {
-      throw new Error("Google Gemini API Key belum dikonfigurasi di server atau Pengaturan.");
+      throw new Error("Google Gemini API Key belum dikonfigurasi di Pengaturan Situs.");
     }
 
     const cleanModel = GeminiService.sanitizeModelName(modelId, false);
@@ -215,10 +266,48 @@ export class GeminiService {
 
       return GeminiService.extractJson(response.text);
     } catch (e: any) {
-      if (e.message?.includes('API_KEY_INVALID') || e.message?.includes('API key not valid')) {
+      if (e.message?.includes('API_KEY_INVALID') || e.message?.includes('API key not valid') || e.message?.includes('400')) {
         throw new Error(`Google Gemini API Key tidak valid. Mohon periksa API Key Google di Pengaturan.`);
       }
       throw e;
+    }
+  }
+
+  // Connection Test method for Admin Settings Panel
+  static async testConnection(settings: AISettings): Promise<{ success: boolean; message: string; latencyMs: number; details?: any }> {
+    const start = Date.now();
+    try {
+      const isExternal = settings.provider === 'external';
+      const prompt = "Buat 1 contoh soal sederhana. Format WAJIB JSON: {\"questions\": [{\"text\": \"Berapa 1+1?\", \"options\": [{\"label\": \"A\", \"text\": \"2\"}], \"answer\": \"A\", \"explanation\": \"1+1=2\", \"type\": \"Pilihan Ganda\", \"indicator\": \"Penjumlahan\", \"cognitiveLevel\": \"C1\"}]}";
+      const system = "Output WAJIB JSON VALID.";
+
+      let res: any;
+      if (isExternal) {
+        const baseUrl = settings.baseUrl || process.env.LITELLM_BASE_URL || 'https://api.openai.com/v1';
+        const apiKey = settings.customApiKey || process.env.OPENAI_API_KEY || process.env.LITELLM_API_KEY || '';
+        const model = settings.targetModel || 'gpt-4o-mini';
+        res = await GeminiService.callOpenAICompatible(baseUrl, apiKey, model, system, prompt);
+      } else {
+        const apiKey = settings.geminiApiKey || settings.customApiKey || process.env.API_KEY || process.env.GEMINI_API_KEY || '';
+        const model = settings.targetModel || 'gemini-2.5-flash';
+        res = await GeminiService.callNativeGemini(apiKey, model, system, prompt);
+      }
+
+      const latencyMs = Date.now() - start;
+      const count = res?.questions?.length || 0;
+      return {
+        success: true,
+        message: `Koneksi Berhasil! Respons (${count} soal) diterima dalam ${latencyMs}ms.`,
+        latencyMs,
+        details: res
+      };
+    } catch (e: any) {
+      const latencyMs = Date.now() - start;
+      return {
+        success: false,
+        message: e.message || "Gagal terhubung ke AI Engine.",
+        latencyMs
+      };
     }
   }
 
@@ -248,16 +337,16 @@ export class GeminiService {
       } catch (primaryErr: any) {
         console.warn(`[AI_ENGINE_WARNING] Primary External Engine Error: ${primaryErr.message}`);
 
-        // Try Fallback to Native Gemini
+        // Try Fallback to Native Gemini only if a valid key is provided
         if (nativeApiKey) {
           try {
             console.log(`[AI_ENGINE] Mencoba Fallback ke Native Gemini Engine (${primaryGeminiModel})...`);
             return await GeminiService.callNativeGemini(nativeApiKey, primaryGeminiModel, system, prompt);
           } catch (fallbackErr: any) {
-            throw new Error(`External Engine Gagal (${primaryErr.message}) & Fallback Gemini Native Gagal (${fallbackErr.message})`);
+            throw new Error(`External Engine Gagal: ${primaryErr.message}. Fallback Gemini Native juga Gagal: ${fallbackErr.message}`);
           }
         } else {
-          throw new Error(`External Engine Gagal (${primaryErr.message}). (Catatan: Fallback Native Gemini tidak memiliki API Key valid)`);
+          throw new Error(`External Engine Gagal: ${primaryErr.message}`);
         }
       }
     } else {
@@ -279,10 +368,10 @@ export class GeminiService {
             console.log(`[AI_ENGINE] Mencoba Fallback ke OpenAI/LiteLLM Engine (${fallbackModel} @ ${fallbackBaseUrl})...`);
             return await GeminiService.callOpenAICompatible(fallbackBaseUrl, fallbackApiKey, fallbackModel, system, prompt);
           } catch (fallbackErr: any) {
-            throw new Error(`Gemini Primary Gagal (${primaryErr.message}) & Fallback OpenAI/LiteLLM Gagal (${fallbackErr.message})`);
+            throw new Error(`Gemini Primary Gagal: ${primaryErr.message}. Fallback OpenAI/LiteLLM Gagal: ${fallbackErr.message}`);
           }
         } else {
-          throw new Error(`Gemini Engine Gagal (${primaryErr.message}). ${isFallbackEnabled ? '(Tips: Masukkan Fallback API Key OpenAI/LiteLLM di Pengaturan Situs agar otomatis beralih)' : ''}`);
+          throw new Error(`Gemini Engine Gagal: ${primaryErr.message}. ${isFallbackEnabled ? '(Tips: Masukkan Fallback API Key OpenAI/LiteLLM di Pengaturan Situs agar otomatis beralih)' : ''}`);
         }
       }
     }
@@ -315,8 +404,9 @@ export class GeminiService {
       }
       return "";
     } catch (e) { 
-      console.error("[GENERATE_VISUAL_ERROR]", e);
+      console.warn("[GENERATE_VISUAL_WARNING] Visual generation failed, proceeding without image:", e);
       return ""; 
     }
   }
 }
+

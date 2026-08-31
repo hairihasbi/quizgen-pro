@@ -166,6 +166,7 @@ export const StorageService = {
       baseUrl: '', 
       customApiKey: '', 
       targetModel: 'gemini-2.5-flash',
+      geminiApiKey: '',
       enableFallback: true,
       fallbackBaseUrl: 'https://api.openai.com/v1',
       fallbackApiKey: '',
