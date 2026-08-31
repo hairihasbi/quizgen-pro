@@ -73,7 +73,8 @@ export interface AISettings {
   customApiKey: string;
   targetModel: string;
   targetImageModel?: string; // New field for External Image Generator
-  
+  geminiApiKey?: string; // Explicit Gemini API Key
+
   // Backup / Fallback AI Engine (OpenAI / LiteLLM)
   enableFallback?: boolean;
   fallbackBaseUrl?: string;
