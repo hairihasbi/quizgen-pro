@@ -3,9 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { StorageService } from '../services/storageService';
 import { GeminiService } from '../services/geminiService';
 import { SUBJECT_DATA, LEVEL_CONFIG, COGNITIVE_LEVELS } from '../constants';
-import { QuestionType, Quiz, AIProgressEvent } from '../types';
+import { QuestionType, Quiz, AIProgressEvent, LogCategory, UserRole } from '../types';
 import { realtimeService } from '../services/realtimeService';
-import { Sparkles, BrainCircuit, BookOpen, Layers, FileText, Loader2, Image as ImageIcon, Brain } from 'lucide-react';
+import { Sparkles, BrainCircuit, BookOpen, Layers, FileText, Loader2, Image as ImageIcon, Brain, CheckCircle2, ArrowRight, AlertCircle, RefreshCw, Archive } from 'lucide-react';
 
 interface CreateQuizProps {
   user: any;
@@ -34,6 +34,7 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
   const [progress, setProgress] = useState(0);
   const [statusMsg, setStatusMsg] = useState('');
   const [workbenchData, setWorkbenchData] = useState<any>(null);
+  const [generationError, setGenerationError] = useState<string | null>(null);
 
   useEffect(() => {
     let standard = 5;
@@ -56,8 +57,17 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
   };
 
   const startGeneration = async () => {
-    if (!formData.title || !formData.topic) return alert('Lengkapi Judul dan Topik!');
+    if (!formData.title || !formData.topic) return alert('Lengkapi Judul dan Topik Soal terlebih dahulu!');
+    if (!formData.subject) return alert('Silakan pilih Mata Pelajaran terlebih dahulu!');
+
+    if (user.role !== UserRole.ADMIN && (user.credits || 0) <= 0) {
+      return alert('Kredit Anda tidak mencukupi untuk membuat soal. Silakan hubungi admin atau lakukan top up.');
+    }
+
     setIsGenerating(true);
+    setGenerationError(null);
+    setProgress(5);
+    setStatusMsg('Menghubungkan ke Neural Engine & Cluster API...');
     
     realtimeService.connect(window.crypto.randomUUID().substring(0,8), (event: AIProgressEvent) => {
       setProgress(event.percentage);
@@ -69,9 +79,10 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
       const result = await gemini.generateQuiz(formData);
       
       if (!result || !result.questions || !Array.isArray(result.questions) || result.questions.length === 0) {
-        throw new Error("AI tidak menghasilkan butir soal yang valid. Silakan coba kembali dengan parameter atau topik yang lebih spesifik.");
+        throw new Error("AI tidak menghasilkan butir soal yang valid. Silakan periksa kembali pengaturan API Key di Admin / LiteLLM atau gunakan parameter topik yang lebih detail.");
       }
 
+      setStatusMsg('Memproses ilustrasi & stimulus naskah...');
       const processedQuestions = await Promise.all(result.questions.map(async (q: any, idx: number) => {
         let imageUrl = '';
         if (formData.imageQuestionsCount > 0 && idx < Math.min(formData.imageQuestionsCount, 3)) {
@@ -84,50 +95,110 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
         return { ...q, id: window.crypto.randomUUID(), image: imageUrl };
       }));
 
-      setWorkbenchData({ ...result, questions: processedQuestions });
+      // OTOMATIS SIMPAN KE ARSIP & RIWAYAT
+      const newQuiz: Quiz = {
+        id: window.crypto.randomUUID(),
+        title: formData.title,
+        subject: formData.subject,
+        level: formData.level,
+        grade: formData.grade,
+        topic: formData.topic,
+        difficulty: formData.difficulty as any,
+        questions: processedQuestions,
+        grid: result.grid || '',
+        authorId: String(user.id),
+        authorName: user.username || user.fullName || 'Guru',
+        isPublished: false,
+        createdAt: new Date().toISOString(),
+        status: 'completed'
+      };
+
+      await StorageService.saveQuizzes([newQuiz]);
+
+      // Kurangi kredit jika user adalah guru
+      if (user.role !== UserRole.ADMIN) {
+        const updatedCredits = Math.max(0, (user.credits || 1) - 1);
+        await StorageService.updateUser(user.id, { credits: updatedCredits });
+        user.credits = updatedCredits;
+      }
+
+      // Catat log
+      await StorageService.addLog({
+        id: window.crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        category: LogCategory.SYSTEM,
+        action: 'GENERATE_QUIZ',
+        details: `Quiz "${newQuiz.title}" (${newQuiz.questions.length} soal) berhasil dibuat & otomatis tersimpan di riwayat.`,
+        status: 'success',
+        userId: String(user.id)
+      });
+
+      realtimeService.reportCompletion("100% Selesai! Naskah berhasil disimpan di Riwayat.");
+      setProgress(100);
+
+      // Tunggu sejenak agar animasi 100% terlihat
+      setTimeout(() => {
+        setWorkbenchData({ ...result, questions: processedQuestions, quizId: newQuiz.id });
+        setIsGenerating(false);
+        realtimeService.disconnect();
+      }, 500);
+
     } catch (e: any) {
-      alert(e.message);
-    } finally {
-      setIsGenerating(false);
+      console.error('[GENERATION_ERROR]', e);
       realtimeService.disconnect();
+      setIsGenerating(false);
+      setGenerationError(e.message || 'Terjadi kesalahan saat memproses generasi soal dengan AI.');
     }
   };
 
-  const saveToDatabase = async () => {
-    const newQuiz: Quiz = {
-      id: window.crypto.randomUUID(),
-      title: formData.title,
-      subject: formData.subject,
-      level: formData.level,
-      grade: formData.grade,
-      topic: formData.topic,
-      difficulty: formData.difficulty as any,
-      questions: workbenchData.questions,
-      grid: workbenchData.grid,
-      authorId: user.id,
-      authorName: user.username,
-      isPublished: false,
-      createdAt: new Date().toISOString(),
-      status: 'completed'
-    };
-    await StorageService.saveQuizzes([newQuiz]);
-    onSuccess();
+  const handleReset = () => {
+    setWorkbenchData(null);
+    setFormData(prev => ({ ...prev, title: '', topic: '' }));
   };
 
   if (workbenchData) {
     return (
       <div className="max-w-5xl mx-auto space-y-8 animate-in zoom-in-95 pb-20">
-        <div className="bg-white p-10 rounded-[3rem] shadow-2xl border border-orange-100">
-           <div className="flex justify-between items-center mb-10 border-b pb-8">
-              <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">Draft Berhasil Disintesis</h2>
-              <div className="flex gap-4">
-                 <button onClick={() => setWorkbenchData(null)} className="px-6 py-3 bg-gray-100 text-gray-400 font-black rounded-2xl text-[10px] uppercase">Edit Parameter</button>
-                 <button onClick={saveToDatabase} className="px-10 py-4 orange-gradient text-white font-black rounded-2xl shadow-xl text-[10px] uppercase">Simpan ke Arsip ➜</button>
+        <div className="bg-white p-8 md:p-10 rounded-[3rem] shadow-2xl border border-orange-100">
+           {/* Success Banner */}
+           <div className="bg-emerald-50 border border-emerald-200 rounded-3xl p-6 mb-8 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                 <div className="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center text-xl shadow-lg shadow-emerald-200">
+                   <CheckCircle2 size={28} />
+                 </div>
+                 <div>
+                   <h3 className="text-base font-black text-emerald-900 uppercase tracking-tight">Soal Berhasil Disintesis & Tersimpan di Riwayat!</h3>
+                   <p className="text-xs font-medium text-emerald-700">Naskah telah otomatis masuk ke <b>Riwayat & Arsip</b>. Anda dapat langsung mengunduh/ekspor (PDF, DOCX, XLSX) atau membuka viewer.</p>
+                 </div>
+              </div>
+              <div className="flex items-center gap-3 w-full md:w-auto">
+                 <button 
+                   onClick={onSuccess} 
+                   className="flex-1 md:flex-none px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl text-xs uppercase tracking-wider shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 hover:scale-105 transition-all"
+                 >
+                   <Archive size={16} /> Buka di Riwayat ➜
+                 </button>
               </div>
            </div>
-           <div className="space-y-12">
+
+           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 border-b pb-6 gap-4">
+              <div>
+                <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">{formData.title || 'Naskah Evaluasi'}</h2>
+                <p className="text-xs text-orange-500 font-bold uppercase tracking-wider mt-1">{formData.subject} • {formData.level} {formData.grade} • {formData.count} Butir Soal</p>
+              </div>
+              <div className="flex gap-3 w-full sm:w-auto">
+                 <button onClick={handleReset} className="flex-1 sm:flex-none px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-black rounded-2xl text-[10px] uppercase transition-all flex items-center justify-center gap-2">
+                   <RefreshCw size={14} /> Buat Soal Baru
+                 </button>
+                 <button onClick={onSuccess} className="flex-1 sm:flex-none px-8 py-3 orange-gradient text-white font-black rounded-2xl shadow-xl text-[10px] uppercase flex items-center justify-center gap-2 hover:scale-105 transition-all">
+                   Lihat di Riwayat <ArrowRight size={14} />
+                 </button>
+              </div>
+           </div>
+
+           <div className="space-y-10">
               {workbenchData.questions.map((q: any, idx: number) => (
-                <div key={q.id} className="p-8 bg-gray-50 rounded-[2.5rem] border border-gray-100">
+                <div key={q.id || idx} className="p-8 bg-gray-50 rounded-[2.5rem] border border-gray-100 shadow-sm">
                   <div className="flex justify-between mb-4">
                      <span className="bg-orange-500 text-white px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-lg">Soal #{idx + 1}</span>
                      <div className="flex gap-2">
@@ -136,7 +207,7 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
                      </div>
                   </div>
                   {q.passage && (
-                    <div className="mb-6 p-6 bg-white border-l-4 border-orange-500 italic text-sm text-gray-600 leading-relaxed shadow-sm">
+                    <div className="mb-6 p-6 bg-white border-l-4 border-orange-500 italic text-sm text-gray-600 leading-relaxed shadow-sm rounded-r-2xl">
                       <div className="text-[8px] font-black uppercase text-orange-400 mb-2">Stimulus Literasi:</div>
                       {q.passage}
                     </div>
@@ -153,9 +224,9 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
                       ))}
                     </div>
                   )}
-                  <div className="mt-6 pt-4 border-t border-dashed flex justify-between items-center">
-                    <div className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest">KUNCI: {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</div>
-                    <div className="text-[8px] text-gray-400 font-medium italic">Indikator: {q.indicator}</div>
+                  <div className="mt-6 pt-4 border-t border-dashed flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <div className="text-xs text-emerald-600 font-bold uppercase tracking-widest">KUNCI: {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}</div>
+                    <div className="text-[10px] text-gray-400 font-medium italic">Indikator: {q.indicator || '-'}</div>
                   </div>
                 </div>
               ))}
@@ -172,7 +243,7 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
           <div className="w-20 h-20 orange-gradient rounded-[2.5rem] flex items-center justify-center text-white shadow-2xl shadow-orange-200"><BrainCircuit size={42} /></div>
           <div>
             <h2 className="text-3xl font-black text-gray-900 tracking-tighter">Quiz <span className="text-orange-500">Generator</span></h2>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Sintesis Soal Berbasis Bloom's Taxonomy</p>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Sintesis Soal Berbasis Bloom's Taxonomy & Kurikulum Merdeka</p>
           </div>
         </div>
         <div className="flex items-center gap-10">
@@ -183,6 +254,26 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
         </div>
       </div>
 
+      {generationError && (
+        <div className="bg-rose-50 border-2 border-rose-200 rounded-[2.5rem] p-8 flex items-start gap-4 animate-in shake">
+           <div className="p-3 bg-rose-500 text-white rounded-2xl">
+             <AlertCircle size={28} />
+           </div>
+           <div className="flex-1 space-y-2">
+              <h3 className="font-black text-rose-900 text-sm uppercase tracking-wide">Gagal Menghasilkan Soal</h3>
+              <p className="text-xs text-rose-700 leading-relaxed font-medium">{generationError}</p>
+              <div className="pt-2 flex gap-3">
+                 <button onClick={() => setGenerationError(null)} className="px-5 py-2 bg-white border border-rose-300 text-rose-700 font-bold rounded-xl text-xs hover:bg-rose-100 transition-all">
+                   Tutup Pesan
+                 </button>
+                 <button onClick={startGeneration} className="px-5 py-2 bg-rose-600 text-white font-bold rounded-xl text-xs hover:bg-rose-700 transition-all">
+                   Coba Lagi
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
            <div className="bg-white p-10 rounded-[3.5rem] shadow-sm border border-orange-50 space-y-10">
@@ -192,7 +283,7 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
                   <FileText className="text-orange-500" size={20} />
                   <h3 className="font-black text-gray-800 uppercase text-xs tracking-widest">Identitas Evaluasi</h3>
                 </div>
-                <input type="text" className="w-full px-6 py-4 rounded-2xl bg-gray-50 border-2 border-transparent focus:border-orange-500 outline-none font-bold transition-all" placeholder="Judul Dokumen (Contoh: UH-1 Eksponen)" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
+                <input type="text" className="w-full px-6 py-4 rounded-2xl bg-gray-50 border-2 border-transparent focus:border-orange-500 outline-none font-bold transition-all" placeholder="Judul Dokumen (Contoh: UH-1 Eksponen & Logaritma)" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
                 <div className="grid grid-cols-2 gap-4">
                   <select className="px-6 py-4 rounded-2xl bg-gray-50 font-bold outline-none border-2 border-transparent focus:border-orange-500" value={formData.level} onChange={e => setFormData({...formData, level: e.target.value})}>
                     {Object.keys(LEVEL_CONFIG).map(l => <option key={l} value={l}>{l}</option>)}
@@ -234,7 +325,7 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
                 </div>
               </div>
 
-              {/* Level Kognitif Section (RESTORASI) */}
+              {/* Level Kognitif Section */}
               <div className="space-y-6">
                  <div className="flex items-center gap-3 border-l-4 border-orange-500 pl-4">
                   <Brain className="text-orange-500" size={20} />
@@ -305,7 +396,7 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
                 <h4 className="text-5xl font-black text-white tracking-tighter">{progress}%</h4>
                 <p className="text-orange-500 font-black uppercase tracking-[0.3em] animate-pulse text-xs">{statusMsg}</p>
               </div>
-              <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+              <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
                 <div className="h-full orange-gradient transition-all duration-500" style={{ width: `${progress}%` }}></div>
               </div>
            </div>
