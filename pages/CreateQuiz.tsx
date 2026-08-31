@@ -27,7 +27,7 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
     imageQuestionsCount: 0,
     literacyMode: 'Tanpa Wacana',
     questionsPerPassage: 3, 
-    model: 'gemini-3-flash-preview'
+    model: 'gemini-2.5-flash'
   });
 
   const [isGenerating, setIsGenerating] = useState(false);
@@ -68,10 +68,18 @@ const CreateQuiz: React.FC<CreateQuizProps> = ({ user, onSuccess }) => {
       const gemini = new GeminiService();
       const result = await gemini.generateQuiz(formData);
       
+      if (!result || !result.questions || !Array.isArray(result.questions) || result.questions.length === 0) {
+        throw new Error("AI tidak menghasilkan butir soal yang valid. Silakan coba kembali dengan parameter atau topik yang lebih spesifik.");
+      }
+
       const processedQuestions = await Promise.all(result.questions.map(async (q: any, idx: number) => {
         let imageUrl = '';
         if (formData.imageQuestionsCount > 0 && idx < Math.min(formData.imageQuestionsCount, 3)) {
-          imageUrl = await gemini.generateVisual(q.text);
+          try {
+            imageUrl = await gemini.generateVisual(q.text);
+          } catch (imgErr) {
+            console.warn('[IMAGE_GEN_SKIPPED]', imgErr);
+          }
         }
         return { ...q, id: window.crypto.randomUUID(), image: imageUrl };
       }));
