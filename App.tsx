@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { UserRole, User } from './types';
+import { User } from './types';
 import { StorageService } from './services/storageService';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
@@ -46,6 +45,7 @@ const App: React.FC = () => {
           
           if (freshUser && freshUser.isActive) {
             setUser(freshUser);
+
             if (savedTab && !['home', 'login', 'gallery', 'register'].includes(savedTab)) {
               setActiveTabState(savedTab);
             } else {
@@ -68,7 +68,6 @@ const App: React.FC = () => {
   const handleLogin = async (loggedUser: User) => {
     const token = await StorageService.createToken(loggedUser);
     localStorage.setItem('quizgen_auth_token', token);
-    
     setUser(loggedUser);
     setActiveTab('dashboard');
   };
