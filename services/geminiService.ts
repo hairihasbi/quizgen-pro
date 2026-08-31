@@ -119,37 +119,119 @@ export class GeminiService {
     userPrompt: string
   ): Promise<any> {
     let cleanBaseUrl = baseUrl.trim().replace(/\/+$/, "");
-    let endpoint = `${cleanBaseUrl}/chat/completions`;
-    if (cleanBaseUrl.endsWith("/chat/completions")) {
-      endpoint = cleanBaseUrl;
+    let endpoint = cleanBaseUrl;
+
+    // Check if user provided Google Generative Language endpoint
+    if (cleanBaseUrl.includes("generativelanguage.googleapis.com")) {
+      if (!cleanBaseUrl.includes("/chat/completions")) {
+        if (!cleanBaseUrl.includes("/openai")) {
+          if (!cleanBaseUrl.includes("/v1beta")) {
+            endpoint = `${cleanBaseUrl}/v1beta/openai/chat/completions`;
+          } else {
+            endpoint = `${cleanBaseUrl}/openai/chat/completions`;
+          }
+        } else {
+          endpoint = `${cleanBaseUrl}/chat/completions`;
+        }
+      }
+    } else {
+      if (!cleanBaseUrl.endsWith("/chat/completions")) {
+        if (cleanBaseUrl.endsWith("/v1") || cleanBaseUrl.endsWith("/v1beta") || cleanBaseUrl.endsWith("/openai")) {
+          endpoint = `${cleanBaseUrl}/chat/completions`;
+        } else {
+          // If no /v1 was given, check if it's a bare domain/host
+          endpoint = `${cleanBaseUrl}/chat/completions`;
+        }
+      }
     }
 
-    const payload = {
-      model: model || "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ],
-      temperature: 0.7,
-      response_format: { type: "json_object" }
-    };
+    const cleanKey = (apiKey || "").trim();
+
+    // If using googleapis endpoint, also add query param for safety
+    if (endpoint.includes("generativelanguage.googleapis.com") && cleanKey && !endpoint.includes("key=")) {
+      endpoint += (endpoint.includes("?") ? "&" : "?") + `key=${encodeURIComponent(cleanKey)}`;
+    }
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json"
     };
-    if (apiKey && apiKey.trim()) {
-      headers["Authorization"] = `Bearer ${apiKey.trim()}`;
+    if (cleanKey) {
+      headers["Authorization"] = `Bearer ${cleanKey}`;
+      headers["api-key"] = cleanKey;
+      headers["x-api-key"] = cleanKey;
+      headers["x-goog-api-key"] = cleanKey;
     }
 
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload)
-    });
+    const makeRequest = async (withJsonFormat: boolean) => {
+      const payload: any = {
+        model: model || "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: 0.7
+      };
+
+      if (withJsonFormat) {
+        payload.response_format = { type: "json_object" };
+      }
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload)
+      });
+
+      return res;
+    };
+
+    let res: Response;
+    try {
+      res = await makeRequest(true);
+    } catch (fetchErr: any) {
+      // If direct endpoint failed and URL didn't have /v1, try fallback with /v1/chat/completions
+      if (!cleanBaseUrl.includes("/v1") && !cleanBaseUrl.endsWith("/chat/completions")) {
+        try {
+          endpoint = `${cleanBaseUrl}/v1/chat/completions`;
+          res = await makeRequest(true);
+        } catch (e) {
+          throw new Error(`Tidak dapat terhubung ke ${cleanBaseUrl}: ${fetchErr.message}. Pastikan URL dapat diakses dan CORS diizinkan.`);
+        }
+      } else {
+        throw new Error(`Gagal menghubungi LiteLLM/LLM Endpoint (${endpoint}): ${fetchErr.message}`);
+      }
+    }
+
+    // If 400 Bad Request happens (some providers do not support response_format: { type: "json_object" })
+    if (res.status === 400) {
+      const errBodyText = await res.text().catch(() => "");
+      // Try again without response_format if it might be an unaccepted parameter
+      if (errBodyText.toLowerCase().includes("response_format") || errBodyText.toLowerCase().includes("additional properties") || errBodyText.toLowerCase().includes("unrecognized")) {
+        console.warn("[LITELLM_RETRY] Retrying request without response_format param...");
+        res = await makeRequest(false);
+      } else {
+        // Parse friendly error message
+        let detailedMsg = errBodyText;
+        try {
+          const parsedErr = JSON.parse(errBodyText);
+          detailedMsg = parsedErr.error?.message || parsedErr.message || errBodyText;
+        } catch (e) {}
+
+        if (detailedMsg.toLowerCase().includes("api key not valid") || detailedMsg.toLowerCase().includes("invalid_argument")) {
+          throw new Error(`LiteLLM / API Gateway Error 400: API Key tidak valid. Silakan periksa kembali API Key / Bearer Token di menu 'API Keys'. Detail: ${detailedMsg}`);
+        }
+        throw new Error(`LiteLLM / API Gateway Error 400: ${detailedMsg}`);
+      }
+    }
 
     if (!res.ok) {
       const errText = await res.text().catch(() => "");
-      throw new Error(`LiteLLM HTTP Error ${res.status}: ${errText || res.statusText}`);
+      let detailedMsg = errText;
+      try {
+        const parsedErr = JSON.parse(errText);
+        detailedMsg = parsedErr.error?.message || parsedErr.message || errText;
+      } catch (e) {}
+      throw new Error(`LiteLLM / API Gateway Error (HTTP ${res.status}): ${detailedMsg || res.statusText}`);
     }
 
     const data = await res.json();
@@ -194,11 +276,13 @@ export class GeminiService {
   ): Promise<{ success: boolean; latencyMs: number; message: string; details?: any }> {
     const startTime = Date.now();
     const testSystem = "Anda adalah AI asisten penguji. Jawab hanya dalam format JSON valid: {\"status\":\"ok\",\"engine\":\"active\"}";
-    const testPrompt = "Test ping";
+    const testPrompt = "Test ping validasi format JSON";
 
     try {
-      if (target === 'primary' && settings.provider === 'external') {
-        if (!settings.baseUrl) throw new Error("Base URL LiteLLM belum diisi.");
+      if (target === 'primary') {
+        if (!settings.baseUrl || !settings.baseUrl.trim()) {
+          throw new Error("Base URL LiteLLM / Gateway belum diisi.");
+        }
         const res = await GeminiService.callOpenAICompatible(
           settings.baseUrl,
           settings.customApiKey,
@@ -207,11 +291,18 @@ export class GeminiService {
           testPrompt
         );
         const latency = Date.now() - startTime;
-        return { success: true, latencyMs: latency, message: `Koneksi LiteLLM Berhasil (${latency}ms)! Model: ${settings.targetModel || 'default'}`, details: res };
+        return { 
+          success: true, 
+          latencyMs: latency, 
+          message: `Koneksi LiteLLM / LLM Gateway Berhasil (${latency}ms)! Model: ${settings.targetModel || 'default'}`, 
+          details: res 
+        };
       }
 
       if (target === 'fallback') {
-        if (!settings.fallbackBaseUrl) throw new Error("Fallback Base URL belum diisi.");
+        if (!settings.fallbackBaseUrl || !settings.fallbackBaseUrl.trim()) {
+          throw new Error("Fallback Base URL belum diisi.");
+        }
         const res = await GeminiService.callOpenAICompatible(
           settings.fallbackBaseUrl,
           settings.fallbackApiKey || "",
@@ -220,7 +311,7 @@ export class GeminiService {
           testPrompt
         );
         const latency = Date.now() - startTime;
-        return { success: true, latencyMs: latency, message: `Koneksi Fallback LiteLLM Berhasil (${latency}ms)! Model: ${settings.fallbackModel}`, details: res };
+        return { success: true, latencyMs: latency, message: `Koneksi Fallback Gateway Berhasil (${latency}ms)! Model: ${settings.fallbackModel}`, details: res };
       }
 
       // Test Gemini Cluster Pool
@@ -239,7 +330,7 @@ export class GeminiService {
       const latency = Date.now() - startTime;
       let errMsg = err.message || "Unknown error";
       if (errMsg.toLowerCase().includes("failed to fetch")) {
-        errMsg += " (Kemungkinan kendala CORS pada LiteLLM Server atau Mixed Content HTTP/HTTPS. Pastikan LiteLLM mengizinkan CORS).";
+        errMsg += " (Kendala CORS pada Server LiteLLM atau Mixed Content HTTP/HTTPS. Pastikan LiteLLM mengizinkan header CORS: CORS_ALLOWED_ORIGINS='*').";
       }
       return { success: false, latencyMs: latency, message: `Uji Koneksi Gagal: ${errMsg}` };
     }
@@ -255,21 +346,30 @@ export class GeminiService {
     VARIAN LEVEL: ${params.cognitiveLevels.join(', ')}.`;
 
     const modelId = params.model || 'gemini-2.5-flash';
+    let externalError: any = null;
 
-    // 1. If provider is external (LiteLLM / OpenAI Gateway), try it first
-    if (aiSettings.provider === 'external' && aiSettings.baseUrl) {
+    // 1. If provider is external (LiteLLM / OpenAI Gateway) OR baseUrl is configured
+    const shouldUseExternal = aiSettings.provider === 'external' || (Boolean(aiSettings.baseUrl && aiSettings.baseUrl.trim().length > 3));
+
+    if (shouldUseExternal && aiSettings.baseUrl) {
       try {
-        console.log(`[AI_GATEWAY] Memanggil External LiteLLM (${aiSettings.baseUrl}) dengan model ${aiSettings.targetModel}...`);
+        console.log(`[AI_GATEWAY] Memanggil External LiteLLM (${aiSettings.baseUrl}) dengan model ${aiSettings.targetModel || 'default'}...`);
         const result = await GeminiService.callOpenAICompatible(
           aiSettings.baseUrl,
           aiSettings.customApiKey,
-          aiSettings.targetModel,
+          aiSettings.targetModel || 'gpt-4o-mini',
           system,
           prompt
         );
         return result;
       } catch (externalErr: any) {
-        console.warn(`[AI_GATEWAY_WARN] External LiteLLM gagal: ${externalErr.message}. Beralih ke Gemini Cluster Pool...`);
+        console.warn(`[AI_GATEWAY_WARN] External LiteLLM gagal: ${externalErr.message}`);
+        externalError = externalErr;
+        
+        // If user explicitly configured 'external' as primary and fallback is disabled, don't silently switch to Gemini Cluster
+        if (aiSettings.provider === 'external' && !aiSettings.enableFallback) {
+          throw new Error(`Gagal memproses dengan LiteLLM / LLM Gateway: ${externalErr.message}`);
+        }
       }
     }
 
@@ -278,34 +378,36 @@ export class GeminiService {
     const activeKeys = allKeys.filter(k => k.isActive && k.key && k.key.trim().length > 5);
     const sortedKeys = [...activeKeys].sort((a, b) => (a.errorCount - b.errorCount) || (a.usageCount - b.usageCount));
 
-    let lastError: any = null;
+    let lastClusterError: any = null;
 
-    for (const keyItem of sortedKeys) {
-      try {
-        console.log(`[AI_CLUSTER] Memanggil node API Key Gemini (${keyItem.key.substring(0, 8)}...)...`);
-        const result = await GeminiService.executeGeminiCall(keyItem.key, modelId, system, prompt);
-        await StorageService.incrementApiKeyUsage(keyItem.key);
-        return result;
-      } catch (err: any) {
-        console.warn(`[AI_CLUSTER_WARN] Node (${keyItem.key.substring(0, 8)}...) gagal: ${err.message}`);
-        await StorageService.reportApiKeyError(keyItem.id);
-        lastError = err;
+    if (sortedKeys.length > 0) {
+      for (const keyItem of sortedKeys) {
+        try {
+          console.log(`[AI_CLUSTER] Memanggil node API Key Gemini (${keyItem.key.substring(0, 8)}...)...`);
+          const result = await GeminiService.executeGeminiCall(keyItem.key, modelId, system, prompt);
+          await StorageService.incrementApiKeyUsage(keyItem.key);
+          return result;
+        } catch (err: any) {
+          console.warn(`[AI_CLUSTER_WARN] Node (${keyItem.key.substring(0, 8)}...) gagal: ${err.message}`);
+          await StorageService.reportApiKeyError(keyItem.id);
+          lastClusterError = err;
+        }
       }
     }
 
     // 3. Try Environment API Key
     const envKey = process.env.API_KEY || process.env.GEMINI_API_KEY || aiSettings.geminiApiKey;
-    if (envKey) {
+    if (envKey && envKey.trim().length > 5) {
       try {
         console.log(`[AI_CLUSTER] Mencoba backup environment API Key...`);
         return await GeminiService.executeGeminiCall(envKey, modelId, system, prompt);
       } catch (err: any) {
-        lastError = err;
+        lastClusterError = err;
       }
     }
 
     // 4. Try Fallback LiteLLM/OpenAI Gateway if configured
-    if (aiSettings.enableFallback && aiSettings.fallbackBaseUrl) {
+    if (aiSettings.enableFallback && aiSettings.fallbackBaseUrl && aiSettings.fallbackBaseUrl.trim().length > 3) {
       try {
         console.log(`[AI_FALLBACK] Mencoba Fallback LiteLLM Gateway (${aiSettings.fallbackBaseUrl})...`);
         return await GeminiService.callOpenAICompatible(
@@ -320,11 +422,16 @@ export class GeminiService {
       }
     }
 
-    if (sortedKeys.length === 0 && !envKey && (!aiSettings.baseUrl || aiSettings.provider !== 'external')) {
+    // If external error occurred, prioritize showing the external error message
+    if (externalError) {
+      throw new Error(`Gagal menggunakan LLM / LiteLLM Gateway: ${externalError.message}${lastClusterError ? ` (Cluster Gemini juga gagal: ${lastClusterError.message})` : ''}`);
+    }
+
+    if (sortedKeys.length === 0 && !envKey && (!aiSettings.baseUrl || !aiSettings.baseUrl.trim())) {
       throw new Error("Belum ada API Key Gemini atau Konfigurasi LiteLLM yang aktif. Silakan buka menu 'API Keys' pada sidebar admin untuk mengaturnya.");
     }
 
-    throw new Error(lastError?.message || "Seluruh mesin AI (LiteLLM & Gemini Cluster) mengalami kegagalan. Silakan periksa pengaturan pada menu 'API Keys'.");
+    throw new Error(lastClusterError?.message || "Seluruh mesin AI (LiteLLM & Gemini Cluster) mengalami kegagalan. Silakan periksa pengaturan pada menu 'API Keys'.");
   }
 
   async generateVisual(prompt: string): Promise<string> {
