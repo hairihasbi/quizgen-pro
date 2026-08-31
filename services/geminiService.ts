@@ -3,11 +3,132 @@ import { StorageService } from "./storageService";
 import { AISettings } from "../types";
 
 export class GeminiService {
+  // Helper to repair invalid JSON escape sequences, unescaped newlines/tabs, LaTeX formulas, and trailing commas
+  private static repairJsonString(input: string): string {
+    let output = '';
+    let inString = false;
+    let isEscaped = false;
+    let i = 0;
+    const len = input.length;
+
+    while (i < len) {
+      const char = input[i];
+
+      if (inString) {
+        if (isEscaped) {
+          isEscaped = false;
+          // Valid standard JSON escape characters: ", \, /, b, f, n, r, t, or u followed by 4 hex
+          if (char === '"' || char === '\\' || char === '/' || char === 'b' || char === 'f' || char === 'n' || char === 'r' || char === 't') {
+            output += '\\' + char;
+          } else if (char === 'u') {
+            const hex = input.slice(i + 1, i + 5);
+            if (/^[0-9a-fA-F]{4}$/.test(hex)) {
+              output += '\\u' + hex;
+              i += 4;
+            } else {
+              // Non-hex unicode-like string (e.g. \underline) -> escape backslash
+              output += '\\\\u';
+            }
+          } else {
+            // Invalid JSON escape (e.g. \sqrt, \alpha, \pm, \div, \cdot, \left, \right, \(, \), \[, \], etc.)
+            // Double escape the backslash so JSON treats it as literal backslash followed by char
+            output += '\\\\' + char;
+          }
+        } else {
+          if (char === '\\') {
+            isEscaped = true;
+          } else if (char === '"') {
+            inString = false;
+            output += '"';
+          } else if (char === '\n') {
+            output += '\\n';
+          } else if (char === '\r') {
+            output += '\\r';
+          } else if (char === '\t') {
+            output += '\\t';
+          } else {
+            const code = char.charCodeAt(0);
+            if (code < 32) {
+              output += '\\u' + code.toString(16).padStart(4, '0');
+            } else {
+              output += char;
+            }
+          }
+        }
+      } else {
+        if (char === '"') {
+          inString = true;
+          output += '"';
+        } else {
+          output += char;
+        }
+      }
+      i++;
+    }
+
+    if (inString && isEscaped) {
+      output += '\\\\';
+    }
+    if (inString) {
+      output += '"';
+    }
+
+    // Remove trailing commas before } or ]
+    output = output.replace(/,\s*([}\]])/g, '$1');
+
+    return output;
+  }
+
+  // Fallback heuristic parser when JSON.parse completely fails
+  private static parseJsonLoose(text: string): any {
+    let clean = text.trim();
+
+    // Try repairing escapes first
+    const repaired = GeminiService.repairJsonString(clean);
+    try {
+      return JSON.parse(repaired);
+    } catch (_) {}
+
+    // Auto-close missing brackets if truncated
+    let openBraces = (repaired.match(/\{/g) || []).length - (repaired.match(/\}/g) || []).length;
+    let openBrackets = (repaired.match(/\[/g) || []).length - (repaired.match(/\]/g) || []).length;
+    let autoClosed = repaired;
+    while (openBrackets > 0) {
+      autoClosed += ']';
+      openBrackets--;
+    }
+    while (openBraces > 0) {
+      autoClosed += '}';
+      openBraces--;
+    }
+    try {
+      return JSON.parse(autoClosed);
+    } catch (_) {}
+
+    // Extract questions array via regex matching
+    const questionRegex = /\{[^{}]*"text"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"[^{}]*\}/g;
+    const matches = clean.match(questionRegex);
+    if (matches && matches.length > 0) {
+      const questions: any[] = [];
+      for (const m of matches) {
+        try {
+          const q = JSON.parse(GeminiService.repairJsonString(m));
+          questions.push(q);
+        } catch (_) {}
+      }
+      if (questions.length > 0) {
+        return { questions };
+      }
+    }
+
+    throw new Error("Gagal menguraikan JSON setelah seluruh tahap perbaikan otomatis.");
+  }
+
   public static extractJson(text: string): any {
     try {
       let cleaned = text.trim();
 
-      // Check and extract codeblocks
+      // Check and extract markdown codeblocks
       const codeBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
       if (codeBlockMatch && codeBlockMatch[1]) {
         cleaned = codeBlockMatch[1].trim();
@@ -22,14 +143,30 @@ export class GeminiService {
 
       let parsed: any = null;
 
+      // Stage 1: Standard parsing on clean slice
+      let targetStr = cleaned;
       if (startObj !== -1 && endObj !== -1 && (startArr === -1 || startObj < startArr)) {
-        const jsonStr = cleaned.substring(startObj, endObj + 1);
-        parsed = JSON.parse(jsonStr);
+        targetStr = cleaned.substring(startObj, endObj + 1);
       } else if (startArr !== -1 && endArr !== -1) {
-        const jsonStr = cleaned.substring(startArr, endArr + 1);
-        parsed = { questions: JSON.parse(jsonStr) };
-      } else {
-        parsed = JSON.parse(cleaned);
+        targetStr = cleaned.substring(startArr, endArr + 1);
+      }
+
+      try {
+        parsed = JSON.parse(targetStr);
+      } catch (directErr) {
+        // Stage 2: Parse with escape & control character repair
+        try {
+          const repaired = GeminiService.repairJsonString(targetStr);
+          parsed = JSON.parse(repaired);
+        } catch (repairErr) {
+          // Stage 3: Loose / resilient parsing
+          parsed = GeminiService.parseJsonLoose(targetStr);
+        }
+      }
+
+      // If parsed was an array, wrap it in questions
+      if (Array.isArray(parsed)) {
+        parsed = { questions: parsed };
       }
 
       // Normalize questions array from various potential keys
@@ -70,7 +207,11 @@ export class GeminiService {
     const { subject, literacyMode, questionsPerPassage, optionCount, cognitiveLevels } = params;
     const isEksakta = /matematika|fisika|kimia|ipa|sains/i.test(subject);
     
-    let instruction = `Anda adalah AI Pakar Kurikulum Merdeka Indonesia. Output WAJIB JSON VALID.
+    let instruction = `Anda adalah AI Pakar Kurikulum Merdeka Indonesia. Output WAJIB BERUPA FORMAT JSON VALID.
+    
+    ATURAN JSON:
+    - Seluruh tanda kutip di dalam string wajib di-escape (\\").
+    - Jika menggunakan rumus matematika atau LaTeX, gunakan double backslash (misal: \\\\frac, \\\\sqrt, \\\\alpha, \\\\times) agar tidak terjadi bad escaped character error.
     
     ATURAN LEVEL KOGNITIF:
     - Distribusikan soal sesuai level yang dipilih user: ${cognitiveLevels.join(', ')}.
@@ -86,8 +227,8 @@ export class GeminiService {
     - Pilihan Ganda: Harus memiliki ${optionCount} opsi. Jawaban: String ("A").
     - Pilihan Ganda Kompleks: Harus memiliki ${optionCount} opsi. Jawaban: ARRAY (Contoh: ["A", "C"]). Berikan minimal 2 jawaban benar.
     
-    MATEMATIKA:
-    ${isEksakta ? '- Gunakan LaTeX: $...$ untuk inline, $$...$$ untuk block.' : ''}
+    MATEMATIKA & EKSAKTA:
+    ${isEksakta ? '- Gunakan notasi LaTeX standar: $...$ untuk inline, $$...$$ untuk block. Selalu gunakan valid JSON string.' : ''}
     
     SCHEMA JSON:
     {
