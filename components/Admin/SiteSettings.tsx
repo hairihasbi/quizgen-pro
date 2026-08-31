@@ -121,17 +121,22 @@ const SiteSettings: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-6 bg-orange-50 border border-orange-100 rounded-[2.5rem] space-y-3">
+            <div className="p-6 bg-slate-900 text-white rounded-[2.5rem] space-y-4 shadow-xl">
                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 orange-gradient rounded-xl flex items-center justify-center text-white text-lg">🔑</div>
+                  <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center text-white text-lg">🔑</div>
                   <div>
-                    <h4 className="text-xs font-black text-gray-800 uppercase">Manajemen API Key</h4>
-                    <p className="text-[9px] text-orange-600 font-bold uppercase">Menu Khusus API Keys Aktif</p>
+                    <h4 className="text-xs font-black uppercase tracking-tight">Pusat Konfigurasi API & AI</h4>
+                    <p className="text-[9px] text-orange-400 font-bold uppercase">Menu Khusus: API Keys</p>
                   </div>
                </div>
-               <p className="text-[10px] text-gray-500 leading-relaxed">
-                 Kunci API Gemini & sistem rotasi multi-key dikelola secara terpusat melalui menu khusus <b>API Keys</b> pada bilah navigasi admin.
+               <p className="text-[11px] text-gray-300 leading-relaxed">
+                 Pengaturan <b>External LiteLLM Proxy / OpenAI Gateway</b> dan <b>Cluster Pool Gemini Keys</b> kini berada terpusat di menu <b>API Keys</b> pada sidebar admin.
                </p>
+               <div className="pt-1 flex flex-wrap gap-2 text-[9px]">
+                  <span className="bg-white/10 px-2.5 py-1 rounded-lg font-mono">🌐 LiteLLM Base URL</span>
+                  <span className="bg-white/10 px-2.5 py-1 rounded-lg font-mono">🔑 Rotating Keys</span>
+                  <span className="bg-white/10 px-2.5 py-1 rounded-lg font-mono">🧪 Test Engine</span>
+               </div>
             </div>
           </div>
         </div>
@@ -139,8 +144,8 @@ const SiteSettings: React.FC = () => {
         <div className="bg-orange-50 p-8 rounded-[2rem] border border-orange-100 flex items-center gap-6">
            <div className="text-4xl">🛡️</div>
            <div>
-              <h4 className="font-black text-orange-800 uppercase text-xs">High Security Key Rotation</h4>
-              <p className="text-[10px] text-orange-600 font-medium uppercase tracking-widest mt-1">Sistem secara cerdas merotasi pemanggilan API ke node cluster aktif untuk memastikan keandalan generasi soal tanpa downtime.</p>
+              <h4 className="font-black text-orange-800 uppercase text-xs">High Security Key Rotation & Failover</h4>
+              <p className="text-[10px] text-orange-600 font-medium uppercase tracking-widest mt-1">Sistem secara cerdas merotasi pemanggilan API ke node cluster aktif dan menyediakan failover otomatis ke gateway cadangan.</p>
            </div>
         </div>
       </div>
