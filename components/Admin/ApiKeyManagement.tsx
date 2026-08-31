@@ -387,6 +387,38 @@ const ApiKeyManagement: React.FC = () => {
             </div>
           </div>
 
+          {/* Quick Presets Section */}
+          <div className="space-y-3">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Template Konfigurasi Cepat (1-Click Preset):</label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+              {[
+                { name: 'LiteLLM Proxy', url: 'https://litellm.yourdomain.com/v1', model: 'gpt-4o-mini', desc: 'Custom LiteLLM' },
+                { name: 'OpenRouter', url: 'https://openrouter.ai/api/v1', model: 'google/gemini-2.5-flash', desc: 'Multi-Model Hub' },
+                { name: 'OpenAI Direct', url: 'https://api.openai.com/v1', model: 'gpt-4o-mini', desc: 'Official OpenAI' },
+                { name: 'Groq Cloud', url: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile', desc: 'Ultra Fast' },
+                { name: 'Google OpenAI', url: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-2.5-flash', desc: 'Gemini OpenAI API' },
+                { name: 'Local Ollama', url: 'http://localhost:11434/v1', model: 'llama3', desc: 'Local AI Server' }
+              ].map(preset => (
+                <button
+                  key={preset.name}
+                  type="button"
+                  onClick={() => {
+                    setAiSettings({
+                      ...aiSettings,
+                      provider: 'external',
+                      baseUrl: preset.url,
+                      targetModel: preset.model
+                    });
+                  }}
+                  className="p-3 bg-gray-50 hover:bg-orange-50 hover:border-orange-200 border border-gray-200 rounded-2xl text-left transition-all group"
+                >
+                  <p className="text-[10px] font-black text-gray-800 group-hover:text-orange-600 truncate">{preset.name}</p>
+                  <p className="text-[8px] text-gray-400 truncate">{preset.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Primary External Config Fields */}
           <div className="p-8 bg-gray-50 rounded-[2.5rem] border space-y-6">
             <div className="flex items-center justify-between border-b pb-4">
@@ -405,7 +437,7 @@ const ApiKeyManagement: React.FC = () => {
                   placeholder="https://litellm.yourdomain.com/v1"
                   className="w-full px-5 py-3.5 rounded-2xl bg-white border border-gray-200 focus:border-slate-900 outline-none font-mono text-xs font-bold"
                   value={aiSettings.baseUrl}
-                  onChange={e => setAiSettings({ ...aiSettings, baseUrl: e.target.value })}
+                  onChange={e => setAiSettings({ ...aiSettings, baseUrl: e.target.value, provider: 'external' })}
                 />
                 <p className="text-[9px] text-gray-400 ml-1">Contoh: https://litellm.internal.id/v1 atau https://api.openai.com/v1</p>
               </div>
@@ -426,7 +458,7 @@ const ApiKeyManagement: React.FC = () => {
                   placeholder="sk-litellm-xxxxxxxxx (atau token proxy Anda)"
                   className="w-full px-5 py-3.5 rounded-2xl bg-white border border-gray-200 focus:border-slate-900 outline-none font-mono text-xs font-bold"
                   value={aiSettings.customApiKey}
-                  onChange={e => setAiSettings({ ...aiSettings, customApiKey: e.target.value })}
+                  onChange={e => setAiSettings({ ...aiSettings, customApiKey: e.target.value, provider: 'external' })}
                 />
               </div>
 
