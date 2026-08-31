@@ -268,8 +268,40 @@ export const StorageService = {
   getQuizzes: async (user?: User): Promise<Quiz[]> => {
     const client = StorageService.getClient();
     let quizzes: Quiz[] = [];
-    if (!client || _isLocal) { quizzes = StorageService.localGet('quizzes'); } else { try { const res = await client.execute("SELECT * FROM quizzes ORDER BY createdAt DESC"); quizzes = res.rows.map((row: any) => ({ id: row.id, title: row.title, subject: row.subject, level: row.level, grade: row.grade, topic: row.topic, subTopic: row.subTopic, difficulty: row.difficulty, questions: JSON.parse(row.questions), grid: row.grid, tags: row.tags ? JSON.parse(row.tags) : [], authorId: row.authorId, authorName: row.authorName, isPublished: Boolean(row.isPublished), createdAt: row.createdAt, status: row.status })); } catch(e) { quizzes = StorageService.localGet('quizzes'); } }
-    if (user && user.role === UserRole.TEACHER) return quizzes.filter(q => q.authorId === user.id);
+    if (!client || _isLocal) { 
+      quizzes = StorageService.localGet('quizzes'); 
+    } else { 
+      try { 
+        const res = await client.execute("SELECT * FROM quizzes ORDER BY createdAt DESC"); 
+        quizzes = res.rows.map((row: any) => ({ 
+          id: row.id, 
+          title: row.title, 
+          subject: row.subject, 
+          level: row.level, 
+          grade: row.grade, 
+          topic: row.topic, 
+          subTopic: row.subTopic, 
+          difficulty: row.difficulty, 
+          questions: typeof row.questions === 'string' ? JSON.parse(row.questions) : row.questions, 
+          grid: row.grid, 
+          tags: row.tags ? (typeof row.tags === 'string' ? JSON.parse(row.tags) : row.tags) : [], 
+          authorId: row.authorId, 
+          authorName: row.authorName, 
+          isPublished: Boolean(row.isPublished), 
+          createdAt: row.createdAt, 
+          status: row.status 
+        })); 
+      } catch(e) { 
+        quizzes = StorageService.localGet('quizzes'); 
+      } 
+    }
+    if (user && user.role === UserRole.TEACHER) {
+      return quizzes.filter(q => 
+        String(q.authorId) === String(user.id) || 
+        q.authorName === user.username || 
+        !q.authorId
+      );
+    }
     return quizzes;
   },
   saveQuizzes: async (quizzes: Quiz[]) => {

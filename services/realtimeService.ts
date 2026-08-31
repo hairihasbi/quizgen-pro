@@ -63,14 +63,19 @@ export class RealtimeService {
     }
   }
 
+  private timeouts: any[] = [];
+
   /**
    * Simulasi emisi event via WebSocket untuk menjamin responsivitas UI
    */
   private simulateConnection(channelId: string) {
+    this.clearTimeouts();
+
     const emit = (event: AIProgressEvent, delay: number) => {
-      setTimeout(() => {
+      const t = setTimeout(() => {
         if (this.onMessageCallback) this.onMessageCallback(event);
       }, delay);
+      this.timeouts.push(t);
     };
 
     const now = () => new Date().toISOString();
@@ -90,19 +95,36 @@ export class RealtimeService {
           isRead: false
         }),
         timestamp: now() 
-      }, 2000);
+      }, 1000);
     } else {
-      emit({ step: 'INITIALIZING', percentage: 5, message: 'Menghubungkan ke Neural Engine...', timestamp: now() }, 200);
-      emit({ step: 'RAG_SCAN', percentage: 15, message: 'Memindai Bank Soal Nasional (RAG)...', details: 'Scanning curriculum vectors for plagiarism prevention', timestamp: now() }, 1000);
-      emit({ step: 'PLAGIARISM_CHECK', percentage: 25, message: 'Verifikasi Orisinalitas Materi...', details: 'Ensuring 100% unique question logic', timestamp: now() }, 2200);
-      emit({ step: 'BATCH_PROCESS', percentage: 50, message: 'Menyusun draf soal yang orisinal...', details: 'Applying Bloom Taxonomy', timestamp: now() }, 4000);
-      emit({ step: 'REFINING', percentage: 75, message: 'Melakukan validasi distractor dan kunci...', details: 'Verifying logical flow', timestamp: now() }, 6500);
-      emit({ step: 'VISUALS', percentage: 90, message: 'Memproses ilustrasi visual...', details: 'Rendering AI stimulus', timestamp: now() }, 8500);
-      emit({ step: 'FINALIZING', percentage: 100, message: 'Finalisasi & Audit Keamanan...', details: 'Orisinalitas terverifikasi 100%', timestamp: now() }, 10000);
+      emit({ step: 'INITIALIZING', percentage: 10, message: 'Menghubungkan ke AI Engine & Cluster Key...', timestamp: now() }, 100);
+      emit({ step: 'RAG_SCAN', percentage: 25, message: 'Memindai Bank Materi & Kurikulum Merdeka...', details: 'Scanning curriculum vectors', timestamp: now() }, 800);
+      emit({ step: 'PLAGIARISM_CHECK', percentage: 45, message: 'Verifikasi Orisinalitas & Taksonomi Bloom...', details: 'Ensuring 100% unique question logic', timestamp: now() }, 2000);
+      emit({ step: 'BATCH_PROCESS', percentage: 65, message: 'Menyusun naskah butir soal & opsi distractor...', details: 'Applying cognitive level matrix', timestamp: now() }, 3800);
+      emit({ step: 'REFINING', percentage: 85, message: 'Validasi kunci jawaban, rubrik, dan stimulus...', details: 'Verifying logical flow', timestamp: now() }, 5500);
+      emit({ step: 'VISUALS', percentage: 92, message: 'Menyelesaikan sintesis & struktur data...', details: 'Finalizing JSON schema', timestamp: now() }, 7500);
     }
   }
 
+  public reportCompletion(message: string = 'Finalisasi & Naskah Tersimpan ke Riwayat!') {
+    this.clearTimeouts();
+    if (this.onMessageCallback) {
+      this.onMessageCallback({
+        step: 'FINALIZING',
+        percentage: 100,
+        message,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
+  private clearTimeouts() {
+    this.timeouts.forEach(t => clearTimeout(t));
+    this.timeouts = [];
+  }
+
   disconnect() {
+    this.clearTimeouts();
     if (this.socket) {
       this.socket.close();
       this.socket = null;
